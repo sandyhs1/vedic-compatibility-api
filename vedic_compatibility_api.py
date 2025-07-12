@@ -300,7 +300,7 @@ def health_check():
 
 @app.route('/', methods=['GET'])
 def root():
-    return jsonify({"status": "healthy", "message": "Vedic Compatibility API is running"})
+    return jsonify({"status": "healthy", "message": "Vedic Compatibility API v2.0 is running"})
 
 @app.route('/api/compatibility', methods=['POST'])
 def compatibility():

@@ -332,6 +332,7 @@ NAKSHATRA_LORDS = [
 def debug_env():
     """Debug endpoint to check environment variables"""
     return jsonify({
+        "OPENAI_API_KEY": "SET" if os.environ.get('OPENAI_API_KEY') else "NOT SET",
         "AZURE_OPENAI_API_KEY": "SET" if os.environ.get('AZURE_OPENAI_API_KEY') else "NOT SET",
         "AZURE_OPENAI_API_BASE": "SET" if os.environ.get('AZURE_OPENAI_API_BASE') else "NOT SET",
         "AZURE_OPENAI_ENDPOINT": "SET" if os.environ.get('AZURE_OPENAI_ENDPOINT') else "NOT SET",
@@ -504,9 +505,9 @@ def generate_enhanced_report(vedic_data):
     """Generate enhanced report using GPT-4o"""
     try:
         # Check if OpenAI API key is available
-        openai_api_key = os.environ.get('AZURE_OPENAI_API_KEY')
+        openai_api_key = os.environ.get('OPENAI_API_KEY')
         if not openai_api_key:
-            return {"error": "Azure OpenAI API key not configured"}
+            return {"error": "OpenAI API key not configured"}
         
         # Create comprehensive prompt for GPT-4o
         prompt = f"""You are a master Vedic astrologer and relationship expert with 50+ years of experience. Generate a COMPREHENSIVE, DETAILED, and HIGHLY PERSONALIZED compatibility report for this couple.
@@ -596,20 +597,14 @@ IMPORTANT REQUIREMENTS:
 
 Generate a report that would make a master Vedic astrologer proud - comprehensive, accurate, beautiful, and deeply meaningful."""
 
-        # Call Azure OpenAI API
-        azure_endpoint = os.environ.get('AZURE_OPENAI_API_BASE') or os.environ.get('AZURE_OPENAI_ENDPOINT')
-        deployment_name = os.environ.get('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
-        api_version = os.environ.get('AZURE_OPENAI_API_VERSION', '2024-11-20')
-        
-        if not azure_endpoint:
-            return {"error": "Azure OpenAI endpoint not configured"}
-        
+        # Call OpenAI API (standard, not Azure)
         headers = {
-            'api-key': openai_api_key,
+            'Authorization': f'Bearer {openai_api_key}',
             'Content-Type': 'application/json'
         }
         
         payload = {
+            'model': 'gpt-4o',
             'messages': [
                 {
                     'role': 'system',
@@ -628,7 +623,7 @@ Generate a report that would make a master Vedic astrologer proud - comprehensiv
         }
         
         response = requests.post(
-            f'{azure_endpoint}/openai/deployments/{deployment_name}/chat/completions?api-version={api_version}',
+            'https://api.openai.com/v1/chat/completions',
             headers=headers,
             json=payload,
             timeout=60

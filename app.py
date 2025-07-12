@@ -328,6 +328,47 @@ NAKSHATRA_LORDS = [
     "Jupiter", "Saturn", "Mercury"
 ]
 
+@app.route('/test-openai', methods=['GET'])
+def test_openai():
+    """Test OpenAI API key"""
+    try:
+        openai_api_key = os.environ.get('OPENAI_API_KEY')
+        if not openai_api_key:
+            return jsonify({"error": "OpenAI API key not configured"})
+        
+        headers = {
+            'Authorization': f'Bearer {openai_api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'model': 'gpt-4o',
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': 'Say "Hello, OpenAI API is working!"'
+                }
+            ],
+            'max_tokens': 50
+        }
+        
+        response = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            content = result['choices'][0]['message']['content']
+            return jsonify({"success": True, "message": content, "status_code": response.status_code})
+        else:
+            return jsonify({"error": f"OpenAI API error: {response.status_code}", "response": response.text})
+            
+    except Exception as e:
+        return jsonify({"error": f"Test failed: {str(e)}"})
+
 @app.route('/debug/env', methods=['GET'])
 def debug_env():
     """Debug endpoint to check environment variables"""

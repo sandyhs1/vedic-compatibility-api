@@ -1,4 +1,4 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
-swisseph==0.0.0.dev1
+ephem==4.1.4
 Werkzeug==2.3.7 

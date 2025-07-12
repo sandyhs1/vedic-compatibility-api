@@ -115,33 +115,38 @@ def get_coordinates(place):
         return 19.0760, 72.8777
 
 def calculate_birth_chart(date_str, time_str, place):
-    """Calculate birth chart using Swiss Ephemeris"""
+    """Calculate birth chart using Swiss Ephemeris with fallback"""
     try:
         # Parse date and time
         date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         
-        # Get coordinates
-        lat, lon = get_coordinates(place)
-        
-        # Convert to Julian Day
-        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 
-                       date_obj.hour + date_obj.minute/60.0)
-        
-        # Calculate Sun position (tropical)
-        sun_pos = swe.calc_ut(jd, swe.SUN)[0]
-        sun_longitude = sun_pos[0]
-        
-        # Apply Lahiri Ayanamsa correction (sidereal)
-        # For 1985, Lahiri Ayanamsa was approximately 23.85 degrees
-        ayanamsa = 23.85 + (date_obj.year - 2000) * 0.000000317
-        sidereal_longitude = sun_longitude - ayanamsa
-        
-        # Normalize to 0-360
-        sidereal_longitude = sidereal_longitude % 360
-        
-        # Special case for April 2, 1985 - should be Magha Nakshatra and Simha Rashi
-        if date_obj.year == 1985 and date_obj.month == 4 and date_obj.day == 2:
-            sidereal_longitude = 125.0  # Middle of Magha Nakshatra in Simha Rashi
+        # Try Swiss Ephemeris first
+        try:
+            # Get coordinates
+            lat, lon = get_coordinates(place)
+            
+            # Convert to Julian Day
+            jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 
+                           date_obj.hour + date_obj.minute/60.0)
+            
+            # Calculate Sun position (tropical)
+            sun_pos = swe.calc_ut(jd, swe.SUN)[0]
+            sun_longitude = sun_pos[0]
+            
+            # Apply Lahiri Ayanamsa correction (sidereal)
+            ayanamsa = 23.85 + (date_obj.year - 2000) * 0.000000317
+            sidereal_longitude = sun_longitude - ayanamsa
+            
+            # Normalize to 0-360
+            sidereal_longitude = sidereal_longitude % 360
+            
+        except Exception as e:
+            print(f"Swiss Ephemeris failed, using fallback: {e}")
+            # Fallback calculation using simplified method
+            # Calculate approximate solar longitude based on date
+            day_of_year = date_obj.timetuple().tm_yday
+            sidereal_longitude = (day_of_year - 80) * 360 / 365.25  # Approximate solar position
+            sidereal_longitude = sidereal_longitude % 360
         
         # Find Nakshatra
         nakshatra = None

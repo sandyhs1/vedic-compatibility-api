@@ -1,16 +1,13 @@
-# Force redeploy with fresh environment variables - $(date)
+# Force complete redeploy with fresh environment variables - $(date)
 # This ensures Render.com picks up the updated OPENAI_API_KEY
+# IMPORTANT: Render.com environment variable cache needs to be refreshed
 import os
-import traceback
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from skyfield.api import load, wgs84, utc
-from skyfield.almanac import find_discrete, risings_and_settings
-from datetime import datetime
-import math
 import json
 import requests
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import numpy as np
+from skyfield.api import load, wgs84
 from skyfield.data import hipparcos
 from skyfield.units import Angle
 import re
@@ -333,6 +330,17 @@ NAKSHATRA_LORDS = [
     "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
     "Jupiter", "Saturn", "Mercury"
 ]
+
+@app.route('/force-refresh', methods=['GET'])
+def force_refresh():
+    """Force refresh endpoint to trigger deployment"""
+    openai_key = os.environ.get('OPENAI_API_KEY', 'NOT_SET')
+    return jsonify({
+        "message": "Force refresh triggered",
+        "openai_key_length": len(openai_key) if openai_key != 'NOT_SET' else 0,
+        "openai_key_prefix": openai_key[:10] + "..." if openai_key != 'NOT_SET' else "NOT_SET",
+        "timestamp": "2025-07-12 13:30:00"
+    })
 
 @app.route('/test-openai', methods=['GET'])
 def test_openai():

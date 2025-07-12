@@ -2,7 +2,8 @@ import os
 import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import ephem
+from skyfield.api import load, wgs84
+from skyfield.almanac import find_discrete, risings_and_settings
 from datetime import datetime
 import math
 import json
@@ -120,7 +121,7 @@ def get_coordinates(place):
     return INDIAN_CITIES["mumbai"]["lat"], INDIAN_CITIES["mumbai"]["lon"]
 
 def calculate_birth_chart(date_str, time_str, place):
-    """Calculate birth chart using ephem"""
+    """Calculate birth chart using skyfield"""
     try:
         # Parse date and time
         date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
@@ -128,18 +129,21 @@ def calculate_birth_chart(date_str, time_str, place):
         # Get coordinates
         lat, lon = get_coordinates(place)
         
-        # Create observer
-        observer = ephem.Observer()
-        observer.lat = str(lat)
-        observer.lon = str(lon)
-        observer.date = date_obj
+        # Load ephemeris
+        ts = load.timescale()
+        t = ts.from_datetime(date_obj)
         
-        # Calculate Sun position
-        sun = ephem.Sun()
-        sun.compute(observer)
+        # Get Sun position
+        eph = load('de421.bsp')
+        sun = eph['sun']
+        earth = eph['earth']
         
-        # Get Sun's longitude (tropical)
-        sun_longitude = math.degrees(sun.hlong)
+        # Calculate Sun's position relative to Earth
+        astrometric = earth.at(t).observe(sun)
+        ra, dec, distance = astrometric.radec()
+        
+        # Convert to ecliptic longitude
+        sun_longitude = ra.hours * 15  # Convert hours to degrees
         
         # Apply Lahiri Ayanamsa correction (sidereal)
         # For 1985, Lahiri Ayanamsa was approximately 23.85 degrees
@@ -296,7 +300,7 @@ def generate_compatibility_analysis(rashi1, rashi2, nakshatra1, nakshatra2, scor
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "healthy", "message": "Vedic Compatibility API is running"})
+    return jsonify({"status": "healthy", "message": "Vedic Compatibility API v2.0 is running"})
 
 @app.route('/', methods=['GET'])
 def root():

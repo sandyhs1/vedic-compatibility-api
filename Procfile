@@ -1,1 +1,1 @@
-web: python vedic_compatibility_api.py 
+web: python app.py 

@@ -15,166 +15,181 @@ from skyfield.units import Angle
 from datetime import datetime
 import math
 import re
+import pytz
 
 app = Flask(__name__)
 CORS(app)
 
 # Local geocoding database for common Indian cities
 INDIAN_CITIES = {
-    "mumbai": {"lat": 19.0760, "lon": 72.8777},
-    "delhi": {"lat": 28.7041, "lon": 77.1025},
-    "bangalore": {"lat": 12.9716, "lon": 77.5946},
-    "hyderabad": {"lat": 17.3850, "lon": 78.4867},
-    "chennai": {"lat": 13.0827, "lon": 80.2707},
-    "kolkata": {"lat": 22.5726, "lon": 88.3639},
-    "pune": {"lat": 18.5204, "lon": 73.8567},
-    "ahmedabad": {"lat": 23.0225, "lon": 72.5714},
-    "surat": {"lat": 21.1702, "lon": 72.8311},
-    "jaipur": {"lat": 26.9124, "lon": 75.7873},
-    "lucknow": {"lat": 26.8467, "lon": 80.9462},
-    "kanpur": {"lat": 26.4499, "lon": 80.3319},
-    "nagpur": {"lat": 21.1458, "lon": 79.0882},
-    "indore": {"lat": 22.7196, "lon": 75.8577},
-    "thane": {"lat": 19.2183, "lon": 72.9781},
-    "bhopal": {"lat": 23.2599, "lon": 77.4126},
-    "visakhapatnam": {"lat": 17.6868, "lon": 83.2185},
-    "patna": {"lat": 25.5941, "lon": 85.1376},
-    "vadodara": {"lat": 22.3072, "lon": 73.1812},
-    "ghaziabad": {"lat": 28.6692, "lon": 77.4538},
-    "ludhiana": {"lat": 30.9010, "lon": 75.8573},
-    "agra": {"lat": 27.1767, "lon": 78.0081},
-    "nashik": {"lat": 19.9975, "lon": 73.7898},
-    "faridabad": {"lat": 28.4089, "lon": 77.3178},
-    "meerut": {"lat": 28.9845, "lon": 77.7064},
-    "rajkot": {"lat": 22.3039, "lon": 70.8022},
-    "kalyan": {"lat": 19.2433, "lon": 73.1355},
-    "vasai": {"lat": 19.4259, "lon": 72.8225},
-    "srinagar": {"lat": 34.0837, "lon": 74.7973},
-    "aurangabad": {"lat": 19.8762, "lon": 75.3433},
-    "dhanbad": {"lat": 23.7957, "lon": 86.4304},
-    "amritsar": {"lat": 31.6340, "lon": 74.8723},
-    "allahabad": {"lat": 25.4358, "lon": 81.8463},
-    "ranchi": {"lat": 23.3441, "lon": 85.3096},
-    "howrah": {"lat": 22.5958, "lon": 88.2636},
-    "coimbatore": {"lat": 11.0168, "lon": 76.9558},
-    "jabalpur": {"lat": 23.1815, "lon": 79.9864},
-    "gwalior": {"lat": 26.2183, "lon": 78.1828},
-    "vijayawada": {"lat": 16.5062, "lon": 80.6480},
-    "jodhpur": {"lat": 26.2389, "lon": 73.0243},
-    "madurai": {"lat": 9.9252, "lon": 78.1198},
-    "raipur": {"lat": 21.2514, "lon": 81.6296},
-    "kota": {"lat": 25.2138, "lon": 75.8648},
-    "guwahati": {"lat": 26.1445, "lon": 91.7362},
-    "chandigarh": {"lat": 30.7333, "lon": 76.7794},
-    "solapur": {"lat": 17.6599, "lon": 75.9064},
-    "hubli": {"lat": 15.3647, "lon": 75.1240},
-    "mysore": {"lat": 12.2958, "lon": 76.6394},
-    "tiruchirappalli": {"lat": 10.7905, "lon": 78.7047},
-    "bareilly": {"lat": 28.3670, "lon": 79.4304},
-    "aligarh": {"lat": 27.8974, "lon": 78.0880},
-    "moradabad": {"lat": 28.8389, "lon": 78.7738},
-    "gurgaon": {"lat": 28.4595, "lon": 77.0266},
-    "noida": {"lat": 28.5355, "lon": 77.3910},
-    "greater noida": {"lat": 28.4744, "lon": 77.5040},
-    "bhubaneswar": {"lat": 20.2961, "lon": 85.8245},
-    "salem": {"lat": 11.6643, "lon": 78.1460},
-    "warangal": {"lat": 17.9689, "lon": 79.5941},
-    "guntur": {"lat": 16.2991, "lon": 80.4575},
-    "bhiwandi": {"lat": 19.2969, "lon": 73.0625},
-    "saharanpur": {"lat": 29.9675, "lon": 77.5451},
-    "gorakhpur": {"lat": 26.7606, "lon": 83.3732},
-    "bikaner": {"lat": 28.0229, "lon": 73.3119},
-    "amravati": {"lat": 20.9374, "lon": 77.7796},
-    "jamshedpur": {"lat": 22.8046, "lon": 86.2029},
-    "bhilai": {"lat": 21.2094, "lon": 81.4285},
-    "cuttack": {"lat": 20.4625, "lon": 85.8830},
-    "firozabad": {"lat": 27.1591, "lon": 78.3958},
-    "kochi": {"lat": 9.9312, "lon": 76.2673},
-    "nellore": {"lat": 14.4426, "lon": 79.9865},
-    "bhavnagar": {"lat": 21.7645, "lon": 72.1519},
-    "dehradun": {"lat": 30.3165, "lon": 78.0322},
-    "durgapur": {"lat": 23.5204, "lon": 87.3119},
-    "asansol": {"lat": 23.6889, "lon": 86.9661},
-    "rourkela": {"lat": 22.2492, "lon": 84.8828},
-    "bhagalpur": {"lat": 25.2445, "lon": 87.0104},
-    "bellary": {"lat": 15.1394, "lon": 76.9214},
-    "mangalore": {"lat": 12.9716, "lon": 74.8631},
-    "tirunelveli": {"lat": 8.7139, "lon": 77.7567},
-    "malegaon": {"lat": 20.5609, "lon": 74.5250},
-    "gaya": {"lat": 24.7914, "lon": 85.0002},
-    "jalandhar": {"lat": 31.3260, "lon": 75.5762},
-    "ujjain": {"lat": 23.1765, "lon": 75.7885},
-    "sangli": {"lat": 16.8524, "lon": 74.5815},
-    "loni": {"lat": 28.7515, "lon": 77.2889},
-    "jammu": {"lat": 32.7266, "lon": 74.8570},
-    "belgaum": {"lat": 15.8497, "lon": 74.4977},
-    "ambattur": {"lat": 13.1143, "lon": 80.1547},
-    "tiruppur": {"lat": 11.1085, "lon": 77.3411},
-    "gulbarga": {"lat": 17.3297, "lon": 76.8343},
-    "akola": {"lat": 20.7096, "lon": 77.0021},
-    "jamnagar": {"lat": 22.4707, "lon": 70.0577},
-    "bhayandar": {"lat": 19.2969, "lon": 72.8500},
-    "morvi": {"lat": 22.8173, "lon": 70.8372}
+    "mumbai": {"lat": 19.0760, "lon": 72.8777, "tz": "Asia/Kolkata"},
+    "delhi": {"lat": 28.7041, "lon": 77.1025, "tz": "Asia/Kolkata"},
+    "bangalore": {"lat": 12.9716, "lon": 77.5946, "tz": "Asia/Kolkata"},
+    "hyderabad": {"lat": 17.3850, "lon": 78.4867, "tz": "Asia/Kolkata"},
+    "chennai": {"lat": 13.0827, "lon": 80.2707, "tz": "Asia/Kolkata"},
+    "kolkata": {"lat": 22.5726, "lon": 88.3639, "tz": "Asia/Kolkata"},
+    "pune": {"lat": 18.5204, "lon": 73.8567, "tz": "Asia/Kolkata"},
+    "ahmedabad": {"lat": 23.0225, "lon": 72.5714, "tz": "Asia/Kolkata"},
+    "surat": {"lat": 21.1702, "lon": 72.8311, "tz": "Asia/Kolkata"},
+    "jaipur": {"lat": 26.9124, "lon": 75.7873, "tz": "Asia/Kolkata"},
+    "lucknow": {"lat": 26.8467, "lon": 80.9462, "tz": "Asia/Kolkata"},
+    "kanpur": {"lat": 26.4499, "lon": 80.3319, "tz": "Asia/Kolkata"},
+    "nagpur": {"lat": 21.1458, "lon": 79.0882, "tz": "Asia/Kolkata"},
+    "indore": {"lat": 22.7196, "lon": 75.8577, "tz": "Asia/Kolkata"},
+    "thane": {"lat": 19.2183, "lon": 72.9781, "tz": "Asia/Kolkata"},
+    "bhopal": {"lat": 23.2599, "lon": 77.4126, "tz": "Asia/Kolkata"},
+    "visakhapatnam": {"lat": 17.6868, "lon": 83.2185, "tz": "Asia/Kolkata"},
+    "patna": {"lat": 25.5941, "lon": 85.1376, "tz": "Asia/Kolkata"},
+    "vadodara": {"lat": 22.3072, "lon": 73.1812, "tz": "Asia/Kolkata"},
+    "ghaziabad": {"lat": 28.6692, "lon": 77.4538, "tz": "Asia/Kolkata"},
+    "ludhiana": {"lat": 30.9010, "lon": 75.8573, "tz": "Asia/Kolkata"},
+    "agra": {"lat": 27.1767, "lon": 78.0081, "tz": "Asia/Kolkata"},
+    "nashik": {"lat": 19.9975, "lon": 73.7898, "tz": "Asia/Kolkata"},
+    "faridabad": {"lat": 28.4089, "lon": 77.3178, "tz": "Asia/Kolkata"},
+    "meerut": {"lat": 28.9845, "lon": 77.7064, "tz": "Asia/Kolkata"},
+    "rajkot": {"lat": 22.3039, "lon": 70.8022, "tz": "Asia/Kolkata"},
+    "kalyan": {"lat": 19.2433, "lon": 73.1355, "tz": "Asia/Kolkata"},
+    "vasai": {"lat": 19.4259, "lon": 72.8225, "tz": "Asia/Kolkata"},
+    "srinagar": {"lat": 34.0837, "lon": 74.7973, "tz": "Asia/Kolkata"},
+    "aurangabad": {"lat": 19.8762, "lon": 75.3433, "tz": "Asia/Kolkata"},
+    "dhanbad": {"lat": 23.7957, "lon": 86.4304, "tz": "Asia/Kolkata"},
+    "amritsar": {"lat": 31.6340, "lon": 74.8723, "tz": "Asia/Kolkata"},
+    "allahabad": {"lat": 25.4358, "lon": 81.8463, "tz": "Asia/Kolkata"},
+    "ranchi": {"lat": 23.3441, "lon": 85.3096, "tz": "Asia/Kolkata"},
+    "howrah": {"lat": 22.5958, "lon": 88.2636, "tz": "Asia/Kolkata"},
+    "coimbatore": {"lat": 11.0168, "lon": 76.9558, "tz": "Asia/Kolkata"},
+    "jabalpur": {"lat": 23.1815, "lon": 79.9864, "tz": "Asia/Kolkata"},
+    "gwalior": {"lat": 26.2183, "lon": 78.1828, "tz": "Asia/Kolkata"},
+    "vijayawada": {"lat": 16.5062, "lon": 80.6480, "tz": "Asia/Kolkata"},
+    "jodhpur": {"lat": 26.2389, "lon": 73.0243, "tz": "Asia/Kolkata"},
+    "madurai": {"lat": 9.9252, "lon": 78.1198, "tz": "Asia/Kolkata"},
+    "raipur": {"lat": 21.2514, "lon": 81.6296, "tz": "Asia/Kolkata"},
+    "kota": {"lat": 25.2138, "lon": 75.8648, "tz": "Asia/Kolkata"},
+    "guwahati": {"lat": 26.1445, "lon": 91.7362, "tz": "Asia/Kolkata"},
+    "chandigarh": {"lat": 30.7333, "lon": 76.7794, "tz": "Asia/Kolkata"},
+    "solapur": {"lat": 17.6599, "lon": 75.9064, "tz": "Asia/Kolkata"},
+    "hubli": {"lat": 15.3647, "lon": 75.1240, "tz": "Asia/Kolkata"},
+    "mysore": {"lat": 12.2958, "lon": 76.6394, "tz": "Asia/Kolkata"},
+    "tiruchirappalli": {"lat": 10.7905, "lon": 78.7047, "tz": "Asia/Kolkata"},
+    "bareilly": {"lat": 28.3670, "lon": 79.4304, "tz": "Asia/Kolkata"},
+    "aligarh": {"lat": 27.8974, "lon": 78.0880, "tz": "Asia/Kolkata"},
+    "moradabad": {"lat": 28.8389, "lon": 78.7738, "tz": "Asia/Kolkata"},
+    "gurgaon": {"lat": 28.4595, "lon": 77.0266, "tz": "Asia/Kolkata"},
+    "noida": {"lat": 28.5355, "lon": 77.3910, "tz": "Asia/Kolkata"},
+    "greater noida": {"lat": 28.4744, "lon": 77.5040, "tz": "Asia/Kolkata"},
+    "bhubaneswar": {"lat": 20.2961, "lon": 85.8245, "tz": "Asia/Kolkata"},
+    "salem": {"lat": 11.6643, "lon": 78.1460, "tz": "Asia/Kolkata"},
+    "warangal": {"lat": 17.9689, "lon": 79.5941, "tz": "Asia/Kolkata"},
+    "guntur": {"lat": 16.2991, "lon": 80.4575, "tz": "Asia/Kolkata"},
+    "bhiwandi": {"lat": 19.2969, "lon": 73.0625, "tz": "Asia/Kolkata"},
+    "saharanpur": {"lat": 29.9675, "lon": 77.5451, "tz": "Asia/Kolkata"},
+    "gorakhpur": {"lat": 26.7606, "lon": 83.3732, "tz": "Asia/Kolkata"},
+    "bikaner": {"lat": 28.0229, "lon": 73.3119, "tz": "Asia/Kolkata"},
+    "amravati": {"lat": 20.9374, "lon": 77.7796, "tz": "Asia/Kolkata"},
+    "jamshedpur": {"lat": 22.8046, "lon": 86.2029, "tz": "Asia/Kolkata"},
+    "bhilai": {"lat": 21.2094, "lon": 81.4285, "tz": "Asia/Kolkata"},
+    "cuttack": {"lat": 20.4625, "lon": 85.8830, "tz": "Asia/Kolkata"},
+    "firozabad": {"lat": 27.1591, "lon": 78.3958, "tz": "Asia/Kolkata"},
+    "kochi": {"lat": 9.9312, "lon": 76.2673, "tz": "Asia/Kolkata"},
+    "nellore": {"lat": 14.4426, "lon": 79.9865, "tz": "Asia/Kolkata"},
+    "bhavnagar": {"lat": 21.7645, "lon": 72.1519, "tz": "Asia/Kolkata"},
+    "dehradun": {"lat": 30.3165, "lon": 78.0322, "tz": "Asia/Kolkata"},
+    "durgapur": {"lat": 23.5204, "lon": 87.3119, "tz": "Asia/Kolkata"},
+    "asansol": {"lat": 23.6889, "lon": 86.9661, "tz": "Asia/Kolkata"},
+    "rourkela": {"lat": 22.2492, "lon": 84.8828, "tz": "Asia/Kolkata"},
+    "bhagalpur": {"lat": 25.2445, "lon": 87.0104, "tz": "Asia/Kolkata"},
+    "bellary": {"lat": 15.1394, "lon": 76.9214, "tz": "Asia/Kolkata"},
+    "mangalore": {"lat": 12.9716, "lon": 74.8631, "tz": "Asia/Kolkata"},
+    "tirunelveli": {"lat": 8.7139, "lon": 77.7567, "tz": "Asia/Kolkata"},
+    "malegaon": {"lat": 20.5609, "lon": 74.5250, "tz": "Asia/Kolkata"},
+    "gaya": {"lat": 24.7914, "lon": 85.0002, "tz": "Asia/Kolkata"},
+    "jalandhar": {"lat": 31.3260, "lon": 75.5762, "tz": "Asia/Kolkata"},
+    "ujjain": {"lat": 23.1765, "lon": 75.7885, "tz": "Asia/Kolkata"},
+    "sangli": {"lat": 16.8524, "lon": 74.5815, "tz": "Asia/Kolkata"},
+    "loni": {"lat": 28.7515, "lon": 77.2889, "tz": "Asia/Kolkata"},
+    "jammu": {"lat": 32.7266, "lon": 74.8570, "tz": "Asia/Kolkata"},
+    "belgaum": {"lat": 15.8497, "lon": 74.4977, "tz": "Asia/Kolkata"},
+    "ambattur": {"lat": 13.1143, "lon": 80.1547, "tz": "Asia/Kolkata"},
+    "tiruppur": {"lat": 11.1085, "lon": 77.3411, "tz": "Asia/Kolkata"},
+    "gulbarga": {"lat": 17.3297, "lon": 76.8343, "tz": "Asia/Kolkata"},
+    "akola": {"lat": 20.7096, "lon": 77.0021, "tz": "Asia/Kolkata"},
+    "jamnagar": {"lat": 22.4707, "lon": 70.0577, "tz": "Asia/Kolkata"},
+    "bhayandar": {"lat": 19.2969, "lon": 72.8500, "tz": "Asia/Kolkata"},
+    "morvi": {"lat": 22.8173, "lon": 70.8372, "tz": "Asia/Kolkata"}
 }
 
 def get_coordinates(place):
-    """Get coordinates for a place using local database"""
+    """Get coordinates and timezone for a place using local database"""
     place_lower = place.lower().strip()
     
     # Check if place is in our database
     if place_lower in INDIAN_CITIES:
-        return INDIAN_CITIES[place_lower]["lat"], INDIAN_CITIES[place_lower]["lon"]
+        city_data = INDIAN_CITIES[place_lower]
+        return city_data["lat"], city_data["lon"], city_data["tz"]
     
     # Default to Mumbai if not found
-    return INDIAN_CITIES["mumbai"]["lat"], INDIAN_CITIES["mumbai"]["lon"]
+    default_data = INDIAN_CITIES["mumbai"]
+    return default_data["lat"], default_data["lon"], default_data["tz"]
 
 def calculate_birth_chart(date_str, time_str, place):
-    """Calculate birth chart using skyfield"""
+    """Calculate birth chart using proper Vedic astrology principles"""
     try:
         # Parse date and time
         date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         
-        # Add UTC timezone (assuming input times are in local time)
-        date_obj = date_obj.replace(tzinfo=utc)
+        # Get coordinates and timezone
+        lat, lon, tz_name = get_coordinates(place)
         
-        # Get coordinates
-        lat, lon = get_coordinates(place)
+        # Convert local time to UTC
+        local_tz = pytz.timezone(tz_name)
+        local_dt = local_tz.localize(date_obj)
+        utc_dt = local_dt.astimezone(pytz.UTC)
         
         # Load ephemeris
         ts = load.timescale()
-        t = ts.from_datetime(date_obj)
+        t = ts.from_datetime(utc_dt)
         
-        # Get Sun position
+        # Get Moon position (for Nakshatra calculation)
         eph = load('de421.bsp')
-        sun = eph['sun']
+        moon = eph['moon']
         earth = eph['earth']
         
-        # Calculate Sun's position relative to Earth
-        astrometric = earth.at(t).observe(sun)
+        # Calculate Moon's position relative to Earth
+        astrometric = earth.at(t).observe(moon)
         ra, dec, distance = astrometric.radec()
         
         # Convert to ecliptic longitude
-        sun_longitude = ra.hours * 15  # Convert hours to degrees
+        moon_longitude = ra.hours * 15  # Convert hours to degrees
         
-        # Apply Lahiri Ayanamsa correction (sidereal)
-        # For 1985, Lahiri Ayanamsa was approximately 23.85 degrees
-        ayanamsa = 23.85 + (date_obj.year - 2000) * 0.000000317
-        sidereal_longitude = sun_longitude - ayanamsa
+        # Apply Lahiri Ayanamsa correction for sidereal zodiac
+        # Lahiri Ayanamsa formula: 23.85 + (year - 2000) * 0.000000317
+        year = utc_dt.year
+        ayanamsa = 23.85 + (year - 2000) * 0.000000317
+        
+        # Calculate sidereal longitude
+        sidereal_longitude = moon_longitude - ayanamsa
         
         # Normalize to 0-360 degrees
         sidereal_longitude = (sidereal_longitude + 360) % 360
         
-        # Calculate rashi (zodiac sign)
-        rashi = int(sidereal_longitude / 30) + 1
+        # Calculate rashi (zodiac sign) - 0-11
+        rashi = int(sidereal_longitude / 30)
         
-        # Calculate nakshatra (lunar mansion)
-        nakshatra = int(sidereal_longitude / 13.333333) + 1
+        # Calculate nakshatra (lunar mansion) - 0-26
+        nakshatra = int(sidereal_longitude / 13.333333)
+        
+        # Ensure valid ranges
+        rashi = max(0, min(11, rashi))
+        nakshatra = max(0, min(26, nakshatra))
         
         return {
-            "rashi": rashi,
-            "nakshatra": nakshatra,
+            "rashi": rashi + 1,  # Convert to 1-based indexing
+            "nakshatra": nakshatra + 1,  # Convert to 1-based indexing
             "longitude": sidereal_longitude,
-            "coordinates": {"lat": lat, "lon": lon}
+            "coordinates": {"lat": lat, "lon": lon},
+            "ayanamsa": ayanamsa,
+            "timezone": tz_name,
+            "utc_time": utc_dt.isoformat()
         }
         
     except Exception as e:
@@ -572,12 +587,12 @@ def generate_enhanced_report(vedic_data):
         prompt = f"""You are a master Vedic astrologer and relationship expert with 50+ years of experience. Generate a COMPREHENSIVE, DETAILED, and HIGHLY PERSONALIZED compatibility report for this couple.
 
 PARTNER DETAILS:
-Partner 1: {vedic_data['partner1_details'].get('name', 'Person 1')} 
+Partner 1: {vedic_data['partner1_details'].get('name', 'Partner 1')} 
 - Date of Birth: {vedic_data['partner1_details']['date']}
 - Time of Birth: {vedic_data['partner1_details']['time']} 
 - Place of Birth: {vedic_data['partner1_details']['place']}
 
-Partner 2: {vedic_data['partner2_details'].get('name', 'Person 2')}
+Partner 2: {vedic_data['partner2_details'].get('name', 'Partner 2')}
 - Date of Birth: {vedic_data['partner2_details']['date']}
 - Time of Birth: {vedic_data['partner2_details']['time']}
 - Place of Birth: {vedic_data['partner2_details']['place']}
@@ -590,7 +605,7 @@ Generate a BEAUTIFUL, COLORFUL, COMPREHENSIVE, ROBUST, ACTION-ORIENTED, and HIGH
 
 1. **DEEP & ACCURATE**: Use the Vedic calculations to provide precise astrological insights
 2. **COMPREHENSIVE**: Cover all aspects of compatibility - personality, emotional, spiritual, practical
-3. **PERSONALIZED**: Reference specific details about each partner's birth chart
+3. **PERSONALIZED**: Reference specific details about each partner's birth chart and use their actual names
 4. **ACTION-ORIENTED**: Provide specific, actionable advice and practices
 5. **BEAUTIFUL**: Use rich, descriptive language that feels magical and meaningful
 6. **BALANCED**: Highlight both strengths and growth areas constructively
@@ -598,7 +613,7 @@ Generate a BEAUTIFUL, COLORFUL, COMPREHENSIVE, ROBUST, ACTION-ORIENTED, and HIGH
 REQUIRED JSON STRUCTURE (return ONLY valid JSON, no markdown):
 {{
   "compatibility_score": number (0-100, based on Vedic calculations),
-  "compatibility_summary": "A beautiful, comprehensive 2-3 sentence summary of their cosmic connection",
+  "compatibility_summary": "A beautiful, comprehensive 2-3 sentence summary of their cosmic connection using their actual names",
   "guna_milan": {{
     "varna": {{ "score": number, "max": number }},
     "vashya": {{ "score": number, "max": number }},
@@ -610,51 +625,53 @@ REQUIRED JSON STRUCTURE (return ONLY valid JSON, no markdown):
     "nadi": {{ "score": number, "max": number }},
     "total_score": number
   }},
-  "personality_matching": "Detailed analysis of how their personalities complement each other, including specific traits from their birth charts",
-  "emotional_compatibility": "Deep dive into emotional harmony, communication styles, and emotional needs based on their astrological profiles",
-  "spiritual_alignment": "Analysis of their spiritual paths, growth potential, and shared spiritual journey",
-  "life_goals_dharma": "Assessment of life purpose alignment, career compatibility, and shared life goals",
+  "personality_matching": "Detailed analysis of how their personalities complement each other, including specific traits from their birth charts and using their actual names",
+  "emotional_compatibility": "Deep dive into emotional harmony, communication styles, and emotional needs based on their astrological profiles, personalized with their names",
+  "spiritual_alignment": "Analysis of their spiritual paths, growth potential, and shared spiritual journey using their actual names",
+  "life_goals_dharma": "Assessment of life purpose alignment, career compatibility, and shared life goals personalized for this specific couple",
   "relationship_strengths": [
-    "Specific strength 1 with astrological basis",
-    "Specific strength 2 with astrological basis", 
-    "Specific strength 3 with astrological basis",
-    "Specific strength 4 with astrological basis",
-    "Specific strength 5 with astrological basis"
+    "Specific strength 1 with astrological basis, mentioning their actual names",
+    "Specific strength 2 with astrological basis, mentioning their actual names", 
+    "Specific strength 3 with astrological basis, mentioning their actual names",
+    "Specific strength 4 with astrological basis, mentioning their actual names",
+    "Specific strength 5 with astrological basis, mentioning their actual names"
   ],
   "growth_areas": [
-    "Specific growth area 1 with constructive guidance",
-    "Specific growth area 2 with constructive guidance",
-    "Specific growth area 3 with constructive guidance"
+    "Specific growth area 1 with constructive guidance, personalized with their names",
+    "Specific growth area 2 with constructive guidance, personalized with their names",
+    "Specific growth area 3 with constructive guidance, personalized with their names"
   ],
   "daily_affirmations": [
-    "Personalized affirmation 1 for their specific compatibility",
-    "Personalized affirmation 2 for their specific compatibility",
-    "Personalized affirmation 3 for their specific compatibility"
+    "Personalized affirmation 1 for their specific compatibility using their actual names",
+    "Personalized affirmation 2 for their specific compatibility using their actual names",
+    "Personalized affirmation 3 for their specific compatibility using their actual names"
   ],
-  "personalized_mantras": "A specific Sanskrit mantra with pronunciation guide and meaning, tailored to their compatibility",
+  "personalized_mantras": "A specific Sanskrit mantra with pronunciation guide and meaning, tailored to their compatibility and mentioning their names",
   "custom_rituals": [
-    "Specific ritual 1 with step-by-step instructions",
-    "Specific ritual 2 with step-by-step instructions", 
-    "Specific ritual 3 with step-by-step instructions"
+    "Specific ritual 1 with step-by-step instructions, personalized for this couple",
+    "Specific ritual 2 with step-by-step instructions, personalized for this couple", 
+    "Specific ritual 3 with step-by-step instructions, personalized for this couple"
   ],
   "action_items": [
-    "Specific actionable step 1 for immediate implementation",
-    "Specific actionable step 2 for immediate implementation",
-    "Specific actionable step 3 for immediate implementation"
+    "Specific actionable step 1 for immediate implementation, mentioning their names",
+    "Specific actionable step 2 for immediate implementation, mentioning their names",
+    "Specific actionable step 3 for immediate implementation, mentioning their names"
   ]
 }}
 
 IMPORTANT REQUIREMENTS:
 - Use the Vedic calculations to inform every section
 - Make each section deeply personalized to their specific birth details
+- ALWAYS use their actual names throughout the report, not generic terms
 - Provide specific, actionable advice, not generic statements
 - Use beautiful, spiritual language that feels meaningful
 - Ensure all text is clear, visible, and high contrast
 - Make the report comprehensive yet easy to understand
 - Include specific astrological references where relevant
 - Focus on both practical and spiritual aspects of their relationship
+- Personalize every section with their actual names and birth details
 
-Generate a report that would make a master Vedic astrologer proud - comprehensive, accurate, beautiful, and deeply meaningful."""
+Generate a report that would make a master Vedic astrologer proud - comprehensive, accurate, beautiful, and deeply meaningful with their actual names."""
 
         # Call OpenAI API (standard, not Azure)
         headers = {

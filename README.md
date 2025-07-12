@@ -169,4 +169,4 @@ The API calculates all 8 factors of Gun Milan:
 curl http://localhost:5000/health
 ```
 
-Returns: `{"status": "healthy", "service": "Vedic Compatibility API"}` 
+Returns: `{"status": "healthy", "service": "Vedic Compatibility API"}` # Force redeploy Sat Jul 12 12:51:52 IST 2025

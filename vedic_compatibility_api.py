@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Initialize Swiss Ephemeris
-swe.set_ephe_path()
+swe.set_ephe_path('./ephe')
 
 # Nakshatra data (27 nakshatras with their lords and degrees)
 NAKSHATRAS = [

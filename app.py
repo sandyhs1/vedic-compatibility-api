@@ -2,7 +2,7 @@ import os
 import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from skyfield.api import load, wgs84
+from skyfield.api import load, wgs84, utc
 from skyfield.almanac import find_discrete, risings_and_settings
 from datetime import datetime
 import math
@@ -125,6 +125,9 @@ def calculate_birth_chart(date_str, time_str, place):
     try:
         # Parse date and time
         date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        
+        # Add UTC timezone (assuming input times are in local time)
+        date_obj = date_obj.replace(tzinfo=utc)
         
         # Get coordinates
         lat, lon = get_coordinates(place)

@@ -1,3 +1,5 @@
+# Force redeploy with fresh environment variables - $(date)
+# This ensures Render.com picks up the updated OPENAI_API_KEY
 import os
 import traceback
 from flask import Flask, request, jsonify
@@ -8,6 +10,10 @@ from datetime import datetime
 import math
 import json
 import requests
+import numpy as np
+from skyfield.data import hipparcos
+from skyfield.units import Angle
+import re
 
 app = Flask(__name__)
 CORS(app)

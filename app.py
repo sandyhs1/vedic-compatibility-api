@@ -584,94 +584,89 @@ def generate_enhanced_report(vedic_data):
             return {"error": "OpenAI API key not configured"}
         
         # Create comprehensive prompt for GPT-4o
-        prompt = f"""You are a master Vedic astrologer and relationship expert with 50+ years of experience. Generate a COMPREHENSIVE, DETAILED, and HIGHLY PERSONALIZED compatibility report for this couple.
+        prompt = f"""You are a master spiritual relationship coach and Vedic wisdom expert with 50+ years of experience. Generate a MAGICAL, TRANSFORMATIVE, and DEEPLY PERSONALIZED relationship enhancement report for this couple.
 
 PARTNER DETAILS:
-Partner 1: {vedic_data['partner1_details'].get('name', 'Partner 1')} 
-- Date of Birth: {vedic_data['partner1_details']['date']}
-- Time of Birth: {vedic_data['partner1_details']['time']} 
-- Place of Birth: {vedic_data['partner1_details']['place']}
+{vedic_data['partner1_details'].get('name', 'Partner 1')}: Born on {vedic_data['partner1_details']['date']} at {vedic_data['partner1_details']['time']} in {vedic_data['partner1_details']['place']}
 
-Partner 2: {vedic_data['partner2_details'].get('name', 'Partner 2')}
-- Date of Birth: {vedic_data['partner2_details']['date']}
-- Time of Birth: {vedic_data['partner2_details']['time']}
-- Place of Birth: {vedic_data['partner2_details']['place']}
+{vedic_data['partner2_details'].get('name', 'Partner 2')}: Born on {vedic_data['partner2_details']['date']} at {vedic_data['partner2_details']['time']} in {vedic_data['partner2_details']['place']}
 
-VEDIC CALCULATIONS & ASTROLOGICAL DATA:
+VEDIC WISDOM & COSMIC DATA:
 {json.dumps(vedic_data, indent=2)}
 
 INSTRUCTIONS:
-Generate a BEAUTIFUL, COLORFUL, COMPREHENSIVE, ROBUST, ACTION-ORIENTED, and HIGHLY PERSONALIZED compatibility report. This report should be:
+Generate a MAGICAL, TRANSFORMATIVE, and DEEPLY PERSONALIZED relationship enhancement report. This is NOT just an astrological report - it's a spiritual journey guide for deepening love, connection, and growth together.
 
-1. **DEEP & ACCURATE**: Use the Vedic calculations to provide precise astrological insights
-2. **COMPREHENSIVE**: Cover all aspects of compatibility - personality, emotional, spiritual, practical
-3. **PERSONALIZED**: Reference specific details about each partner's birth chart and use their actual names
-4. **ACTION-ORIENTED**: Provide specific, actionable advice and practices
-5. **BEAUTIFUL**: Use rich, descriptive language that feels magical and meaningful
-6. **BALANCED**: Highlight both strengths and growth areas constructively
+CORE PRINCIPLES:
+1. **SPIRITUAL GROWTH**: Focus on how their cosmic connection can help them evolve spiritually together
+2. **LOVE ENHANCEMENT**: Provide specific ways to deepen their love and emotional bond
+3. **PRACTICAL MAGIC**: Give actionable rituals, practices, and daily habits
+4. **PERSONALIZED WISDOM**: Use their actual names and specific birth details throughout
+5. **MODERN APPROACH**: Present ancient wisdom in contemporary, relatable language
+6. **RELATIONSHIP FOCUS**: Emphasize building a beautiful, lasting partnership
 
 REQUIRED JSON STRUCTURE (return ONLY valid JSON, no markdown):
 {{
   "compatibility_score": number (0-100, based on Vedic calculations),
-  "compatibility_summary": "A beautiful, comprehensive 2-3 sentence summary of their cosmic connection using their actual names",
-  "guna_milan": {{
-    "varna": {{ "score": number, "max": number }},
-    "vashya": {{ "score": number, "max": number }},
-    "tara": {{ "score": number, "max": number }},
-    "yoni": {{ "score": number, "max": number }},
-    "graha_maitri": {{ "score": number, "max": number }},
-    "gana": {{ "score": number, "max": number }},
-    "bhakoot": {{ "score": number, "max": number }},
-    "nadi": {{ "score": number, "max": number }},
-    "total_score": number
-  }},
-  "personality_matching": "Detailed analysis of how their personalities complement each other, including specific traits from their birth charts and using their actual names",
-  "emotional_compatibility": "Deep dive into emotional harmony, communication styles, and emotional needs based on their astrological profiles, personalized with their names",
-  "spiritual_alignment": "Analysis of their spiritual paths, growth potential, and shared spiritual journey using their actual names",
-  "life_goals_dharma": "Assessment of life purpose alignment, career compatibility, and shared life goals personalized for this specific couple",
+  "cosmic_connection_summary": "A beautiful, magical 2-3 sentence summary of their divine connection using their actual names",
+  "love_story_theme": "A poetic theme that describes their unique love story (e.g., 'The Dance of Fire and Water', 'Guardians of Sacred Light')",
+  "spiritual_growth_path": "How their relationship serves their individual and collective spiritual evolution, personalized with their names",
+  "emotional_bond_analysis": "Deep analysis of their emotional connection, communication styles, and how to strengthen their bond using their actual names",
+  "love_languages_revealed": "Specific love languages and ways they can express love to each other, personalized for their cosmic profiles",
+  "sacred_rituals": [
+    "A beautiful morning ritual for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to start their day with love",
+    "An evening practice for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to deepen their connection",
+    "A weekly spiritual practice for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to grow together"
+  ],
+  "daily_love_practices": [
+    "A specific daily practice for {vedic_data['partner1_details'].get('name', 'Partner 1')} to show love to {vedic_data['partner2_details'].get('name', 'Partner 2')}",
+    "A daily gesture for {vedic_data['partner2_details'].get('name', 'Partner 2')} to nurture {vedic_data['partner1_details'].get('name', 'Partner 1')}",
+    "A shared daily moment for both {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to connect deeply"
+  ],
   "relationship_strengths": [
-    "Specific strength 1 with astrological basis, mentioning their actual names",
-    "Specific strength 2 with astrological basis, mentioning their actual names", 
-    "Specific strength 3 with astrological basis, mentioning their actual names",
-    "Specific strength 4 with astrological basis, mentioning their actual names",
-    "Specific strength 5 with astrological basis, mentioning their actual names"
+    "Specific cosmic strength 1 for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} with spiritual context",
+    "Specific cosmic strength 2 for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} with spiritual context",
+    "Specific cosmic strength 3 for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} with spiritual context",
+    "Specific cosmic strength 4 for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} with spiritual context",
+    "Specific cosmic strength 5 for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} with spiritual context"
   ],
-  "growth_areas": [
-    "Specific growth area 1 with constructive guidance, personalized with their names",
-    "Specific growth area 2 with constructive guidance, personalized with their names",
-    "Specific growth area 3 with constructive guidance, personalized with their names"
+  "growth_opportunities": [
+    "A specific growth opportunity for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} with loving guidance",
+    "A beautiful challenge for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to overcome together",
+    "A spiritual lesson for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to learn as a couple"
   ],
-  "daily_affirmations": [
-    "Personalized affirmation 1 for their specific compatibility using their actual names",
-    "Personalized affirmation 2 for their specific compatibility using their actual names",
-    "Personalized affirmation 3 for their specific compatibility using their actual names"
+  "sacred_affirmations": [
+    "A personalized affirmation for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to recite together",
+    "A daily mantra for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to strengthen their bond",
+    "A powerful declaration for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to speak into their relationship"
   ],
-  "personalized_mantras": "A specific Sanskrit mantra with pronunciation guide and meaning, tailored to their compatibility and mentioning their names",
-  "custom_rituals": [
-    "Specific ritual 1 with step-by-step instructions, personalized for this couple",
-    "Specific ritual 2 with step-by-step instructions, personalized for this couple", 
-    "Specific ritual 3 with step-by-step instructions, personalized for this couple"
+  "personalized_mantra": "A specific Sanskrit mantra with pronunciation guide and meaning, tailored for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to chant together",
+  "love_enhancement_tools": [
+    "A specific tool for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to deepen intimacy",
+    "A practice for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to improve communication",
+    "A ritual for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to celebrate their love"
   ],
-  "action_items": [
-    "Specific actionable step 1 for immediate implementation, mentioning their names",
-    "Specific actionable step 2 for immediate implementation, mentioning their names",
-    "Specific actionable step 3 for immediate implementation, mentioning their names"
-  ]
+  "immediate_action_steps": [
+    "A specific action for {vedic_data['partner1_details'].get('name', 'Partner 1')} to take today to show love to {vedic_data['partner2_details'].get('name', 'Partner 2')}",
+    "A gesture for {vedic_data['partner2_details'].get('name', 'Partner 2')} to make today to nurture {vedic_data['partner1_details'].get('name', 'Partner 1')}",
+    "A shared activity for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} to do together this week"
+  ],
+  "cosmic_gifts": "A description of the unique gifts {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} bring to each other's lives",
+  "relationship_mission": "The higher purpose and mission of {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')} as a couple"
 }}
 
-IMPORTANT REQUIREMENTS:
-- Use the Vedic calculations to inform every section
-- Make each section deeply personalized to their specific birth details
-- ALWAYS use their actual names throughout the report, not generic terms
-- Provide specific, actionable advice, not generic statements
-- Use beautiful, spiritual language that feels meaningful
-- Ensure all text is clear, visible, and high contrast
-- Make the report comprehensive yet easy to understand
-- Include specific astrological references where relevant
-- Focus on both practical and spiritual aspects of their relationship
-- Personalize every section with their actual names and birth details
+CRITICAL REQUIREMENTS:
+- ALWAYS use their actual names throughout the report, never generic terms
+- Make every section deeply personalized to their specific birth details
+- Focus on LOVE, CONNECTION, and SPIRITUAL GROWTH, not just astrology
+- Provide specific, actionable practices they can implement immediately
+- Use beautiful, magical language that feels transformative
+- Emphasize their unique cosmic connection and how to nurture it
+- Include both practical relationship advice and spiritual wisdom
+- Make the report feel like a sacred guide for their love journey
+- Ensure all content is positive, empowering, and relationship-enhancing
 
-Generate a report that would make a master Vedic astrologer proud - comprehensive, accurate, beautiful, and deeply meaningful with their actual names."""
+Generate a report that would make a master spiritual relationship coach proud - magical, transformative, deeply personalized, and focused on creating a beautiful, lasting love story for {vedic_data['partner1_details'].get('name', 'Partner 1')} and {vedic_data['partner2_details'].get('name', 'Partner 2')}."""
 
         # Call OpenAI API (standard, not Azure)
         headers = {

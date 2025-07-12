@@ -564,4 +564,4 @@ def health():
     return jsonify({"status": "healthy", "service": "Vedic Compatibility API"})
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001) 
+    app.run(debug=True, host='0.0.0.0', port=5001) # Force redeploy Sat Jul 12 12:39:14 IST 2025

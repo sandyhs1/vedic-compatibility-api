@@ -1,4 +1,5 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
 numpy>=1.26.0
-skyfield==1.53 
+skyfield==1.53
+requests==2.31.0 

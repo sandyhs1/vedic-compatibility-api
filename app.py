@@ -7,6 +7,7 @@ from skyfield.almanac import find_discrete, risings_and_settings
 from datetime import datetime
 import math
 import json
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -302,8 +303,8 @@ def generate_compatibility_analysis(rashi1, rashi2, nakshatra1, nakshatra2, scor
     return analysis
 
 RASHI_NAMES = [
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
+    "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya", 
+    "Tula", "Vrishchika", "Dhanu", "Makara", "Kumbha", "Meena"
 ]
 
 NAKSHATRA_NAMES = [
@@ -406,6 +407,235 @@ def compatibility():
         print(f"Error in compatibility endpoint: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/compatibility/enhanced', methods=['POST'])
+def enhanced_compatibility():
+    """Generate enhanced compatibility report using GPT-4o"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'partner1' not in data or 'partner2' not in data:
+            return jsonify({"error": "Missing partner data"}), 400
+        
+        partner1_data = data['partner1']
+        partner2_data = data['partner2']
+        
+        # Calculate birth charts
+        chart1 = calculate_birth_chart(partner1_data['date'], partner1_data['time'], partner1_data['place'])
+        chart2 = calculate_birth_chart(partner2_data['date'], partner2_data['time'], partner2_data['place'])
+        
+        if not chart1 or not chart2:
+            return jsonify({"error": "Failed to calculate birth charts"}), 500
+        
+        # Calculate compatibility
+        compatibility_data = calculate_compatibility(chart1, chart2)
+        
+        # Calculate Guna Milan (8 aspects of compatibility)
+        gun_milan_score = calculate_guna_milan(chart1, chart2)
+        max_possible_score = 36  # Maximum possible score in Guna Milan
+        
+        # Generate detailed breakdown
+        breakdown = generate_gun_milan_breakdown(chart1, chart2)
+        
+        # Generate remarks and issues
+        remarks = generate_compatibility_remarks(gun_milan_score, max_possible_score)
+        issues_detected = detect_compatibility_issues(chart1, chart2, gun_milan_score)
+        
+        # Calculate spiritual alignment
+        spiritual_alignment_score = calculate_spiritual_alignment(chart1, chart2)
+        
+        # Format charts with proper Sanskrit names
+        partner1_chart = {
+            "longitude": chart1["longitude"],
+            "nakshatra": NAKSHATRA_NAMES[chart1["nakshatra"] - 1],
+            "nakshatra_lord": NAKSHATRA_LORDS[chart1["nakshatra"] - 1],
+            "rashi": RASHI_NAMES[chart1["rashi"] - 1],
+            "rashi_lord": RASHI_LORDS[chart1["rashi"] - 1]
+        }
+        
+        partner2_chart = {
+            "longitude": chart2["longitude"],
+            "nakshatra": NAKSHATRA_NAMES[chart2["nakshatra"] - 1],
+            "nakshatra_lord": NAKSHATRA_LORDS[chart2["nakshatra"] - 1],
+            "rashi": RASHI_NAMES[chart2["rashi"] - 1],
+            "rashi_lord": RASHI_LORDS[chart2["rashi"] - 1]
+        }
+        
+        # Prepare Vedic data for GPT-4o
+        vedic_data = {
+            "gun_milan_score": gun_milan_score,
+            "max_possible_score": max_possible_score,
+            "compatibility_level": compatibility_data["compatibility_level"],
+            "breakdown": breakdown,
+            "remarks": remarks,
+            "issues_detected": issues_detected,
+            "spiritual_alignment_score": spiritual_alignment_score,
+            "partner1_chart": partner1_chart,
+            "partner2_chart": partner2_chart,
+            "partner1_details": partner1_data,
+            "partner2_details": partner2_data
+        }
+        
+        # Generate enhanced report using GPT-4o
+        enhanced_report = generate_enhanced_report(vedic_data)
+        
+        return jsonify({
+            "vedic_data": vedic_data,
+            "enhanced_report": enhanced_report
+        })
+        
+    except Exception as e:
+        print(f"Error in enhanced compatibility endpoint: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": "Internal server error"}), 500
+
+def generate_enhanced_report(vedic_data):
+    """Generate enhanced report using GPT-4o"""
+    try:
+        # Check if OpenAI API key is available
+        openai_api_key = os.environ.get('OPENAI_API_KEY')
+        if not openai_api_key:
+            return {"error": "OpenAI API key not configured"}
+        
+        # Create comprehensive prompt for GPT-4o
+        prompt = f"""You are a master Vedic astrologer and relationship expert with 50+ years of experience. Generate a COMPREHENSIVE, DETAILED, and HIGHLY PERSONALIZED compatibility report for this couple.
+
+PARTNER DETAILS:
+Partner 1: {vedic_data['partner1_details'].get('name', 'Person 1')} 
+- Date of Birth: {vedic_data['partner1_details']['date']}
+- Time of Birth: {vedic_data['partner1_details']['time']} 
+- Place of Birth: {vedic_data['partner1_details']['place']}
+
+Partner 2: {vedic_data['partner2_details'].get('name', 'Person 2')}
+- Date of Birth: {vedic_data['partner2_details']['date']}
+- Time of Birth: {vedic_data['partner2_details']['time']}
+- Place of Birth: {vedic_data['partner2_details']['place']}
+
+VEDIC CALCULATIONS & ASTROLOGICAL DATA:
+{json.dumps(vedic_data, indent=2)}
+
+INSTRUCTIONS:
+Generate a BEAUTIFUL, COLORFUL, COMPREHENSIVE, ROBUST, ACTION-ORIENTED, and HIGHLY PERSONALIZED compatibility report. This report should be:
+
+1. **DEEP & ACCURATE**: Use the Vedic calculations to provide precise astrological insights
+2. **COMPREHENSIVE**: Cover all aspects of compatibility - personality, emotional, spiritual, practical
+3. **PERSONALIZED**: Reference specific details about each partner's birth chart
+4. **ACTION-ORIENTED**: Provide specific, actionable advice and practices
+5. **BEAUTIFUL**: Use rich, descriptive language that feels magical and meaningful
+6. **BALANCED**: Highlight both strengths and growth areas constructively
+
+REQUIRED JSON STRUCTURE (return ONLY valid JSON, no markdown):
+{{
+  "compatibility_score": number (0-100, based on Vedic calculations),
+  "compatibility_summary": "A beautiful, comprehensive 2-3 sentence summary of their cosmic connection",
+  "guna_milan": {{
+    "varna": {{ "score": number, "max": number }},
+    "vashya": {{ "score": number, "max": number }},
+    "tara": {{ "score": number, "max": number }},
+    "yoni": {{ "score": number, "max": number }},
+    "graha_maitri": {{ "score": number, "max": number }},
+    "gana": {{ "score": number, "max": number }},
+    "bhakoot": {{ "score": number, "max": number }},
+    "nadi": {{ "score": number, "max": number }},
+    "total_score": number
+  }},
+  "personality_matching": "Detailed analysis of how their personalities complement each other, including specific traits from their birth charts",
+  "emotional_compatibility": "Deep dive into emotional harmony, communication styles, and emotional needs based on their astrological profiles",
+  "spiritual_alignment": "Analysis of their spiritual paths, growth potential, and shared spiritual journey",
+  "life_goals_dharma": "Assessment of life purpose alignment, career compatibility, and shared life goals",
+  "relationship_strengths": [
+    "Specific strength 1 with astrological basis",
+    "Specific strength 2 with astrological basis", 
+    "Specific strength 3 with astrological basis",
+    "Specific strength 4 with astrological basis",
+    "Specific strength 5 with astrological basis"
+  ],
+  "growth_areas": [
+    "Specific growth area 1 with constructive guidance",
+    "Specific growth area 2 with constructive guidance",
+    "Specific growth area 3 with constructive guidance"
+  ],
+  "daily_affirmations": [
+    "Personalized affirmation 1 for their specific compatibility",
+    "Personalized affirmation 2 for their specific compatibility",
+    "Personalized affirmation 3 for their specific compatibility"
+  ],
+  "personalized_mantras": "A specific Sanskrit mantra with pronunciation guide and meaning, tailored to their compatibility",
+  "custom_rituals": [
+    "Specific ritual 1 with step-by-step instructions",
+    "Specific ritual 2 with step-by-step instructions", 
+    "Specific ritual 3 with step-by-step instructions"
+  ],
+  "action_items": [
+    "Specific actionable step 1 for immediate implementation",
+    "Specific actionable step 2 for immediate implementation",
+    "Specific actionable step 3 for immediate implementation"
+  ]
+}}
+
+IMPORTANT REQUIREMENTS:
+- Use the Vedic calculations to inform every section
+- Make each section deeply personalized to their specific birth details
+- Provide specific, actionable advice, not generic statements
+- Use beautiful, spiritual language that feels meaningful
+- Ensure all text is clear, visible, and high contrast
+- Make the report comprehensive yet easy to understand
+- Include specific astrological references where relevant
+- Focus on both practical and spiritual aspects of their relationship
+
+Generate a report that would make a master Vedic astrologer proud - comprehensive, accurate, beautiful, and deeply meaningful."""
+
+        # Call OpenAI API
+        headers = {
+            'Authorization': f'Bearer {openai_api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'model': 'gpt-4o',
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': 'You are a master Vedic astrologer with 50+ years of experience in relationship compatibility analysis. You have deep knowledge of Vedic astrology, Guna Milan, Nakshatra matching, and spiritual relationship dynamics. Generate COMPLETELY ACCURATE, COMPREHENSIVE, and HIGHLY PERSONALIZED compatibility reports based on provided birth details and Vedic calculations. Your reports should be beautiful, meaningful, and actionable. Return ONLY valid JSON, no markdown or extra text. Every section should be deeply personalized and specific to the couple.'
+                },
+                {
+                    'role': 'user',
+                    'content': prompt
+                }
+            ],
+            'temperature': 0.8,
+            'max_tokens': 4000,
+            'top_p': 0.9,
+            'frequency_penalty': 0.1,
+            'presence_penalty': 0.1
+        }
+        
+        response = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        if response.status_code != 200:
+            return {"error": f"OpenAI API error: {response.status_code}"}
+        
+        result = response.json()
+        content = result['choices'][0]['message']['content']
+        
+        # Parse the JSON response
+        try:
+            # Remove any non-JSON content that might be present
+            import re
+            json_str = re.sub(r'^```json\s*|\s*```$', '', content.strip())
+            enhanced_report = json.loads(json_str)
+            return enhanced_report
+        except json.JSONDecodeError as e:
+            return {"error": f"Failed to parse GPT response: {str(e)}", "raw_content": content}
+            
+    except Exception as e:
+        print(f"Error generating enhanced report: {str(e)}")
+        return {"error": f"Failed to generate enhanced report: {str(e)}"}
 
 def calculate_guna_milan(chart1, chart2):
     """Calculate Guna Milan score (1-36)"""

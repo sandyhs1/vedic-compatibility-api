@@ -6,12 +6,14 @@ import geopy.geocoders
 from geopy.exc import GeocoderTimedOut
 import math
 import json
+import os
+import traceback
 
 app = Flask(__name__)
 CORS(app)
 
 # Initialize Swiss Ephemeris
-swe.set_ephe_path('./ephe')
+swe.set_ephe_path(os.path.join(os.path.dirname(__file__), "ephe"))
 
 # Nakshatra data (27 nakshatras with their lords and degrees)
 NAKSHATRAS = [
@@ -115,53 +117,35 @@ def get_coordinates(place):
         return 19.0760, 72.8777
 
 def calculate_birth_chart(date_str, time_str, place):
-    """Calculate birth chart using Swiss Ephemeris with fallback"""
+    """Calculate birth chart using Swiss Ephemeris"""
     try:
         # Parse date and time
         date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-        
-        # Try Swiss Ephemeris first
-        try:
-            # Get coordinates
-            lat, lon = get_coordinates(place)
-            
-            # Convert to Julian Day
-            jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 
-                           date_obj.hour + date_obj.minute/60.0)
-            
-            # Calculate Sun position (tropical)
-            sun_pos = swe.calc_ut(jd, swe.SUN)[0]
-            sun_longitude = sun_pos[0]
-            
-            # Apply Lahiri Ayanamsa correction (sidereal)
-            ayanamsa = 23.85 + (date_obj.year - 2000) * 0.000000317
-            sidereal_longitude = sun_longitude - ayanamsa
-            
-            # Normalize to 0-360
-            sidereal_longitude = sidereal_longitude % 360
-            
-        except Exception as e:
-            print(f"Swiss Ephemeris failed, using fallback: {e}")
-            # Fallback calculation using simplified method
-            # Calculate approximate solar longitude based on date
-            day_of_year = date_obj.timetuple().tm_yday
-            sidereal_longitude = (day_of_year - 80) * 360 / 365.25  # Approximate solar position
-            sidereal_longitude = sidereal_longitude % 360
-        
+        # Get coordinates
+        lat, lon = get_coordinates(place)
+        # Convert to Julian Day
+        jd = swe.julday(date_obj.year, date_obj.month, date_obj.day, 
+                       date_obj.hour + date_obj.minute/60.0)
+        # Calculate Sun position (tropical)
+        sun_pos = swe.calc_ut(jd, swe.SUN)[0]
+        sun_longitude = sun_pos[0]
+        # Apply Lahiri Ayanamsa correction (sidereal)
+        ayanamsa = 23.85 + (date_obj.year - 2000) * 0.000000317
+        sidereal_longitude = sun_longitude - ayanamsa
+        # Normalize to 0-360
+        sidereal_longitude = sidereal_longitude % 360
         # Find Nakshatra
         nakshatra = None
         for nak in NAKSHATRAS:
             if nak["start"] <= sidereal_longitude < nak["end"]:
                 nakshatra = nak
                 break
-        
         # Find Rashi
         rashi = None
         for rash in RASHIS:
             if rash["start"] <= sidereal_longitude < rash["end"]:
                 rashi = rash
                 break
-        
         return {
             "longitude": sidereal_longitude,
             "nakshatra": nakshatra["name"] if nakshatra else "Unknown",
@@ -171,7 +155,8 @@ def calculate_birth_chart(date_str, time_str, place):
         }
     except Exception as e:
         print(f"Error calculating birth chart: {e}")
-        return None
+        traceback.print_exc()
+        return {"error": str(e), "trace": traceback.format_exc()}
 
 def calculate_gun_milan(chart1, chart2):
     """Calculate Gun Milan compatibility"""
@@ -357,6 +342,11 @@ def compatibility():
         chart1 = calculate_birth_chart(partner1['date'], partner1['time'], partner1['place'])
         chart2 = calculate_birth_chart(partner2['date'], partner2['time'], partner2['place'])
         
+        # If either chart is an error dict, return the error
+        if isinstance(chart1, dict) and 'error' in chart1:
+            return jsonify({"error": "Failed to calculate birth chart for partner1", "details": chart1}), 400
+        if isinstance(chart2, dict) and 'error' in chart2:
+            return jsonify({"error": "Failed to calculate birth chart for partner2", "details": chart2}), 400
         if not chart1 or not chart2:
             return jsonify({"error": "Failed to calculate birth charts"}), 400
         
@@ -404,7 +394,9 @@ def compatibility():
         return jsonify(response)
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"API error: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/health', methods=['GET'])
 def health():

@@ -1,9 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import swisseph as swe
+import pyswisseph as swe
 from datetime import datetime
-import geopy.geocoders
-from geopy.exc import GeocoderTimedOut
 import math
 import json
 import os
@@ -102,18 +100,181 @@ VASYA_SCORES = {
     ("Meena", "Dhanu"): 2, ("Meena", "Makara"): 1, ("Meena", "Kumbha"): 1, ("Meena", "Meena"): 2
 }
 
+# Local geocoding database for common Indian cities
+INDIAN_CITIES = {
+    "mumbai": {"lat": 19.0760, "lon": 72.8777},
+    "delhi": {"lat": 28.7041, "lon": 77.1025},
+    "bangalore": {"lat": 12.9716, "lon": 77.5946},
+    "hyderabad": {"lat": 17.3850, "lon": 78.4867},
+    "chennai": {"lat": 13.0827, "lon": 80.2707},
+    "kolkata": {"lat": 22.5726, "lon": 88.3639},
+    "pune": {"lat": 18.5204, "lon": 73.8567},
+    "ahmedabad": {"lat": 23.0225, "lon": 72.5714},
+    "jaipur": {"lat": 26.9124, "lon": 75.7873},
+    "lucknow": {"lat": 26.8467, "lon": 80.9462},
+    "kanpur": {"lat": 26.4499, "lon": 80.3319},
+    "nagpur": {"lat": 21.1458, "lon": 79.0882},
+    "indore": {"lat": 22.7196, "lon": 75.8577},
+    "thane": {"lat": 19.2183, "lon": 72.9781},
+    "bhopal": {"lat": 23.2599, "lon": 77.4126},
+    "visakhapatnam": {"lat": 17.6868, "lon": 83.2185},
+    "patna": {"lat": 25.5941, "lon": 85.1376},
+    "vadodara": {"lat": 22.3072, "lon": 73.1812},
+    "ghaziabad": {"lat": 28.6692, "lon": 77.4538},
+    "ludhiana": {"lat": 30.9010, "lon": 75.8573},
+    "agra": {"lat": 27.1767, "lon": 78.0081},
+    "nashik": {"lat": 19.9975, "lon": 73.7898},
+    "faridabad": {"lat": 28.4089, "lon": 77.3178},
+    "meerut": {"lat": 28.9845, "lon": 77.7064},
+    "rajkot": {"lat": 22.3039, "lon": 70.8022},
+    "kalyan": {"lat": 19.2433, "lon": 73.1355},
+    "vasai": {"lat": 19.4259, "lon": 72.8225},
+    "srinagar": {"lat": 34.0837, "lon": 74.7973},
+    "aurangabad": {"lat": 19.8762, "lon": 75.3433},
+    "dhanbad": {"lat": 23.7957, "lon": 86.4304},
+    "amritsar": {"lat": 31.6340, "lon": 74.8723},
+    "allahabad": {"lat": 25.4358, "lon": 81.8463},
+    "ranchi": {"lat": 23.3441, "lon": 85.3096},
+    "howrah": {"lat": 22.5958, "lon": 88.2636},
+    "coimbatore": {"lat": 11.0168, "lon": 76.9558},
+    "jabalpur": {"lat": 23.1815, "lon": 79.9864},
+    "gwalior": {"lat": 26.2183, "lon": 78.1828},
+    "vijayawada": {"lat": 16.5062, "lon": 80.6480},
+    "jodhpur": {"lat": 26.2389, "lon": 73.0243},
+    "madurai": {"lat": 9.9252, "lon": 78.1198},
+    "raipur": {"lat": 21.2514, "lon": 81.6296},
+    "kota": {"lat": 25.2138, "lon": 75.8648},
+    "guwahati": {"lat": 26.1445, "lon": 91.7362},
+    "chandigarh": {"lat": 30.7333, "lon": 76.7794},
+    "solapur": {"lat": 17.6599, "lon": 75.9064},
+    "hubli": {"lat": 15.3647, "lon": 75.1240},
+    "bareilly": {"lat": 28.3670, "lon": 79.4304},
+    "moradabad": {"lat": 28.8389, "lon": 78.7738},
+    "mysore": {"lat": 12.2958, "lon": 76.6394},
+    "gurgaon": {"lat": 28.4595, "lon": 77.0266},
+    "aligarh": {"lat": 27.8974, "lon": 78.0880},
+    "jalandhar": {"lat": 31.3260, "lon": 75.5762},
+    "tiruchirappalli": {"lat": 10.7905, "lon": 78.7047},
+    "bhubaneswar": {"lat": 20.2961, "lon": 85.8245},
+    "salem": {"lat": 11.6643, "lon": 78.1460},
+    "warangal": {"lat": 17.9689, "lon": 79.5941},
+    "mira": {"lat": 19.2952, "lon": 72.8544},
+    "thiruvananthapuram": {"lat": 8.5241, "lon": 76.9366},
+    "bhiwandi": {"lat": 19.2969, "lon": 73.0625},
+    "saharanpur": {"lat": 29.9675, "lon": 77.5451},
+    "guntur": {"lat": 16.2991, "lon": 80.4575},
+    "amravati": {"lat": 20.9374, "lon": 77.7796},
+    "noida": {"lat": 28.5355, "lon": 77.3910},
+    "jamshedpur": {"lat": 22.8046, "lon": 86.2029},
+    "bhilai": {"lat": 21.2094, "lon": 81.4285},
+    "cuttack": {"lat": 20.4625, "lon": 85.8830},
+    "firozabad": {"lat": 27.1591, "lon": 78.3958},
+    "kochi": {"lat": 9.9312, "lon": 76.2673},
+    "nellore": {"lat": 14.4426, "lon": 79.9865},
+    "bhavnagar": {"lat": 21.7645, "lon": 72.1519},
+    "dehradun": {"lat": 30.3165, "lon": 78.0322},
+    "durgapur": {"lat": 23.5204, "lon": 87.3119},
+    "asansol": {"lat": 23.6889, "lon": 86.9661},
+    "rourkela": {"lat": 22.2492, "lon": 84.8828},
+    "bhagalpur": {"lat": 25.2445, "lon": 87.0068},
+    "bellary": {"lat": 15.1394, "lon": 76.9214},
+    "mangalore": {"lat": 12.9716, "lon": 74.8631},
+    "tiruppur": {"lat": 11.1085, "lon": 77.3411},
+    "malegaon": {"lat": 20.5609, "lon": 74.5251},
+    "belgaum": {"lat": 15.8497, "lon": 74.4977},
+    "kurnool": {"lat": 15.8281, "lon": 78.0373},
+    "rajahmundry": {"lat": 17.0005, "lon": 81.8040},
+    "kadapa": {"lat": 14.4753, "lon": 78.8354},
+    "kakinada": {"lat": 16.9891, "lon": 82.2475},
+    "tirupati": {"lat": 13.6288, "lon": 79.4192},
+    "anantapur": {"lat": 14.6819, "lon": 77.6006},
+    "karimnagar": {"lat": 18.4386, "lon": 79.1288},
+    "nizamabad": {"lat": 18.6725, "lon": 78.0941},
+    "eluru": {"lat": 16.7069, "lon": 81.1046},
+    "baroda": {"lat": 22.3072, "lon": 73.1812},  # Same as vadodara
+    "varanasi": {"lat": 25.3176, "lon": 82.9739},
+    "srinagar": {"lat": 34.0837, "lon": 74.7973},
+    "agra": {"lat": 27.1767, "lon": 78.0081},
+    "lucknow": {"lat": 26.8467, "lon": 80.9462},
+    "kanpur": {"lat": 26.4499, "lon": 80.3319},
+    "nagpur": {"lat": 21.1458, "lon": 79.0882},
+    "indore": {"lat": 22.7196, "lon": 75.8577},
+    "bhopal": {"lat": 23.2599, "lon": 77.4126},
+    "patna": {"lat": 25.5941, "lon": 85.1376},
+    "ranchi": {"lat": 23.3441, "lon": 85.3096},
+    "jabalpur": {"lat": 23.1815, "lon": 79.9864},
+    "gwalior": {"lat": 26.2183, "lon": 78.1828},
+    "jodhpur": {"lat": 26.2389, "lon": 73.0243},
+    "raipur": {"lat": 21.2514, "lon": 81.6296},
+    "kota": {"lat": 25.2138, "lon": 75.8648},
+    "guwahati": {"lat": 26.1445, "lon": 91.7362},
+    "chandigarh": {"lat": 30.7333, "lon": 76.7794},
+    "bareilly": {"lat": 28.3670, "lon": 79.4304},
+    "moradabad": {"lat": 28.8389, "lon": 78.7738},
+    "aligarh": {"lat": 27.8974, "lon": 78.0880},
+    "jalandhar": {"lat": 31.3260, "lon": 75.5762},
+    "bhubaneswar": {"lat": 20.2961, "lon": 85.8245},
+    "warangal": {"lat": 17.9689, "lon": 79.5941},
+    "thiruvananthapuram": {"lat": 8.5241, "lon": 76.9366},
+    "saharanpur": {"lat": 29.9675, "lon": 77.5451},
+    "guntur": {"lat": 16.2991, "lon": 80.4575},
+    "amravati": {"lat": 20.9374, "lon": 77.7796},
+    "jamshedpur": {"lat": 22.8046, "lon": 86.2029},
+    "bhilai": {"lat": 21.2094, "lon": 81.4285},
+    "cuttack": {"lat": 20.4625, "lon": 85.8830},
+    "firozabad": {"lat": 27.1591, "lon": 78.3958},
+    "kochi": {"lat": 9.9312, "lon": 76.2673},
+    "nellore": {"lat": 14.4426, "lon": 79.9865},
+    "bhavnagar": {"lat": 21.7645, "lon": 72.1519},
+    "dehradun": {"lat": 30.3165, "lon": 78.0322},
+    "durgapur": {"lat": 23.5204, "lon": 87.3119},
+    "asansol": {"lat": 23.6889, "lon": 86.9661},
+    "rourkela": {"lat": 22.2492, "lon": 84.8828},
+    "bhagalpur": {"lat": 25.2445, "lon": 87.0068},
+    "bellary": {"lat": 15.1394, "lon": 76.9214},
+    "mangalore": {"lat": 12.9716, "lon": 74.8631},
+    "tiruppur": {"lat": 11.1085, "lon": 77.3411},
+    "malegaon": {"lat": 20.5609, "lon": 74.5251},
+    "belgaum": {"lat": 15.8497, "lon": 74.4977},
+    "kurnool": {"lat": 15.8281, "lon": 78.0373},
+    "rajahmundry": {"lat": 17.0005, "lon": 81.8040},
+    "kadapa": {"lat": 14.4753, "lon": 78.8354},
+    "kakinada": {"lat": 16.9891, "lon": 82.2475},
+    "tirupati": {"lat": 13.6288, "lon": 79.4192},
+    "anantapur": {"lat": 14.6819, "lon": 77.6006},
+    "karimnagar": {"lat": 18.4386, "lon": 79.1288},
+    "nizamabad": {"lat": 18.6725, "lon": 78.0941},
+    "eluru": {"lat": 16.7069, "lon": 81.1046},
+    "varanasi": {"lat": 25.3176, "lon": 82.9739}
+}
+
 def get_coordinates(place):
-    """Get latitude and longitude for a place"""
+    """Get coordinates for a place using local database"""
     try:
-        geolocator = geopy.geocoders.Nominatim(user_agent="vedic_compatibility")
-        location = geolocator.geocode(place)
-        if location:
-            return location.latitude, location.longitude
-        else:
-            # Default to Mumbai if place not found
-            return 19.0760, 72.8777
-    except GeocoderTimedOut:
-        # Default to Mumbai if geocoding fails
+        # Clean the place name
+        place_lower = place.lower().strip()
+        
+        # Remove common suffixes
+        place_lower = place_lower.replace(", india", "").replace(", india", "")
+        place_lower = place_lower.replace(" city", "").replace(" town", "")
+        
+        # Try exact match first
+        if place_lower in INDIAN_CITIES:
+            coords = INDIAN_CITIES[place_lower]
+            return coords["lat"], coords["lon"]
+        
+        # Try partial matches
+        for city, coords in INDIAN_CITIES.items():
+            if city in place_lower or place_lower in city:
+                return coords["lat"], coords["lon"]
+        
+        # Default to Mumbai if no match found
+        print(f"Place '{place}' not found in database, defaulting to Mumbai")
+        return 19.0760, 72.8777
+        
+    except Exception as e:
+        print(f"Error in get_coordinates: {e}")
+        # Default to Mumbai
         return 19.0760, 72.8777
 
 def calculate_birth_chart(date_str, time_str, place):

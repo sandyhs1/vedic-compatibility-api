@@ -298,6 +298,10 @@ def generate_compatibility_analysis(rashi1, rashi2, nakshatra1, nakshatra2, scor
 def health_check():
     return jsonify({"status": "healthy", "message": "Vedic Compatibility API is running"})
 
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({"status": "healthy", "message": "Vedic Compatibility API is running"})
+
 @app.route('/api/compatibility', methods=['POST'])
 def compatibility():
     try:
@@ -367,4 +371,11 @@ def compatibility():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    print(f"Starting Vedic Compatibility API on port {port}")
+    print(f"Environment: PORT={os.environ.get('PORT', 'Not set')}")
+    try:
+        app.run(host='0.0.0.0', port=port, debug=False)
+    except Exception as e:
+        print(f"Failed to start server: {e}")
+        import traceback
+        traceback.print_exc()

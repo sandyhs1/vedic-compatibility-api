@@ -302,16 +302,29 @@ def generate_compatibility_analysis(rashi1, rashi2, nakshatra1, nakshatra2, scor
     return analysis
 
 RASHI_NAMES = [
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
 ]
+
 NAKSHATRA_NAMES = [
-    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
+    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", 
+    "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", 
+    "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", 
+    "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", 
+    "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
 ]
+
 RASHI_LORDS = [
-    "Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter"
+    "Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury",
+    "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter"
 ]
+
 NAKSHATRA_LORDS = [
-    "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury", "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury", "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"
+    "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
+    "Jupiter", "Saturn", "Mercury", "Ketu", "Venus", "Sun",
+    "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury",
+    "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
+    "Jupiter", "Saturn", "Mercury"
 ]
 
 @app.route('/health', methods=['GET'])
@@ -326,60 +339,303 @@ def root():
 def compatibility():
     try:
         data = request.get_json()
-        p1 = data.get('partner1')
-        p2 = data.get('partner2')
-        if not p1 or not p2:
-            return jsonify({'error': 'Missing partner data'}), 400
-        chart1 = calculate_birth_chart(p1['date'], p1['time'], p1['place'])
-        chart2 = calculate_birth_chart(p2['date'], p2['time'], p2['place'])
+        
+        if not data or 'partner1' not in data or 'partner2' not in data:
+            return jsonify({"error": "Missing partner data"}), 400
+        
+        partner1_data = data['partner1']
+        partner2_data = data['partner2']
+        
+        # Calculate birth charts
+        chart1 = calculate_birth_chart(partner1_data['date'], partner1_data['time'], partner1_data['place'])
+        chart2 = calculate_birth_chart(partner2_data['date'], partner2_data['time'], partner2_data['place'])
+        
         if not chart1 or not chart2:
-            return jsonify({'error': 'Invalid birth data'}), 400
-        # Compatibility calculation (placeholder logic)
-        rashi_score = 8
-        nakshatra_score = 7
-        overall_score = (rashi_score + nakshatra_score) / 2
-        # Guna Milan breakdown (placeholder values)
-        breakdown = {
-            "varna": {"score": 1, "max": 1, "description": "Same varna"},
-            "vashya": {"score": 2, "max": 2, "description": "Compatible"},
-            "tara": {"score": 3, "max": 3, "description": "Good"},
-            "yoni": {"score": 4, "max": 4, "description": "Excellent"},
-            "graha_maitri": {"score": 5, "max": 5, "description": "Very good"},
-            "gana": {"score": 6, "max": 6, "description": "Perfect"},
-            "bhakoot": {"score": 7, "max": 7, "description": "Strong"},
-            "nadi": {"score": 8, "max": 8, "description": "No dosha"}
+            return jsonify({"error": "Failed to calculate birth charts"}), 500
+        
+        # Calculate compatibility
+        compatibility_data = calculate_compatibility(chart1, chart2)
+        
+        # Calculate Guna Milan (8 aspects of compatibility)
+        gun_milan_score = calculate_guna_milan(chart1, chart2)
+        max_possible_score = 36  # Maximum possible score in Guna Milan
+        
+        # Generate detailed breakdown
+        breakdown = generate_gun_milan_breakdown(chart1, chart2)
+        
+        # Generate remarks and issues
+        remarks = generate_compatibility_remarks(gun_milan_score, max_possible_score)
+        issues_detected = detect_compatibility_issues(chart1, chart2, gun_milan_score)
+        
+        # Calculate spiritual alignment
+        spiritual_alignment_score = calculate_spiritual_alignment(chart1, chart2)
+        
+        # Format charts with proper names
+        partner1_chart = {
+            "longitude": chart1["longitude"],
+            "nakshatra": NAKSHATRA_NAMES[chart1["nakshatra"] - 1],
+            "nakshatra_lord": NAKSHATRA_LORDS[chart1["nakshatra"] - 1],
+            "rashi": RASHI_NAMES[chart1["rashi"] - 1],
+            "rashi_lord": RASHI_LORDS[chart1["rashi"] - 1]
         }
-        remarks = "This is a highly compatible match."
-        issues_detected = []
-        spiritual_alignment_score = 9
-        # Map rashi/nakshatra numbers to names
-        def chart_struct(chart):
-            rashi_num = int(chart["rashi"]) - 1
-            nakshatra_num = int(chart["nakshatra"]) - 1
-            return {
-                "longitude": chart["longitude"],
-                "nakshatra": NAKSHATRA_NAMES[nakshatra_num],
-                "nakshatra_lord": NAKSHATRA_LORDS[nakshatra_num],
-                "rashi": RASHI_NAMES[rashi_num],
-                "rashi_lord": RASHI_LORDS[rashi_num],
-                "coordinates": chart["coordinates"]
-            }
-        response = {
-            "gun_milan_score": 28,
-            "max_possible_score": 36,
-            "compatibility_level": "Excellent",
+        
+        partner2_chart = {
+            "longitude": chart2["longitude"],
+            "nakshatra": NAKSHATRA_NAMES[chart2["nakshatra"] - 1],
+            "nakshatra_lord": NAKSHATRA_LORDS[chart2["nakshatra"] - 1],
+            "rashi": RASHI_NAMES[chart2["rashi"] - 1],
+            "rashi_lord": RASHI_LORDS[chart2["rashi"] - 1]
+        }
+        
+        # Return the complete compatibility report
+        report = {
+            "gun_milan_score": gun_milan_score,
+            "max_possible_score": max_possible_score,
+            "compatibility_level": compatibility_data["compatibility_level"],
             "breakdown": breakdown,
             "remarks": remarks,
             "issues_detected": issues_detected,
             "spiritual_alignment_score": spiritual_alignment_score,
-            "partner1_chart": chart_struct(chart1),
-            "partner2_chart": chart_struct(chart2)
+            "partner1_chart": partner1_chart,
+            "partner2_chart": partner2_chart
         }
-        return jsonify(response)
+        
+        return jsonify(report)
+        
     except Exception as e:
         print(f"Error in compatibility endpoint: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": "Internal server error"}), 500
+
+def calculate_guna_milan(chart1, chart2):
+    """Calculate Guna Milan score (1-36)"""
+    score = 0
+    
+    # Varna (1 point)
+    varna1 = (chart1["rashi"] - 1) % 4
+    varna2 = (chart2["rashi"] - 1) % 4
+    if varna1 == varna2:
+        score += 1
+    
+    # Vashya (2 points)
+    vashya_score = calculate_vashya_compatibility(chart1["rashi"], chart2["rashi"])
+    score += vashya_score
+    
+    # Tara (3 points)
+    tara_score = calculate_tara_compatibility(chart1["nakshatra"], chart2["nakshatra"])
+    score += tara_score
+    
+    # Yoni (4 points)
+    yoni_score = calculate_yoni_compatibility(chart1["nakshatra"], chart2["nakshatra"])
+    score += yoni_score
+    
+    # Graha Maitri (5 points)
+    graha_score = calculate_graha_maitri(chart1["rashi"], chart2["rashi"])
+    score += graha_score
+    
+    # Gana (6 points)
+    gana_score = calculate_gana_compatibility(chart1["nakshatra"], chart2["nakshatra"])
+    score += gana_score
+    
+    # Bhakoot (7 points)
+    bhakoot_score = calculate_bhakoot_compatibility(chart1["rashi"], chart2["rashi"])
+    score += bhakoot_score
+    
+    # Nadi (8 points)
+    nadi_score = calculate_nadi_compatibility(chart1["nakshatra"], chart2["nakshatra"])
+    score += nadi_score
+    
+    return score
+
+def calculate_vashya_compatibility(rashi1, rashi2):
+    """Calculate Vashya compatibility (0-2 points)"""
+    # Simplified calculation
+    diff = abs(rashi1 - rashi2)
+    if diff == 0:
+        return 2
+    elif diff in [1, 11]:
+        return 1
+    else:
+        return 0
+
+def calculate_tara_compatibility(nakshatra1, nakshatra2):
+    """Calculate Tara compatibility (0-3 points)"""
+    # Simplified calculation
+    diff = abs(nakshatra1 - nakshatra2)
+    if diff == 0:
+        return 3
+    elif diff in [1, 2, 3]:
+        return 2
+    elif diff in [4, 5, 6]:
+        return 1
+    else:
+        return 0
+
+def calculate_yoni_compatibility(nakshatra1, nakshatra2):
+    """Calculate Yoni compatibility (0-4 points)"""
+    # Simplified calculation
+    diff = abs(nakshatra1 - nakshatra2)
+    if diff == 0:
+        return 4
+    elif diff in [1, 2]:
+        return 3
+    elif diff in [3, 4]:
+        return 2
+    elif diff in [5, 6]:
+        return 1
+    else:
+        return 0
+
+def calculate_graha_maitri(rashi1, rashi2):
+    """Calculate Graha Maitri compatibility (0-5 points)"""
+    # Simplified calculation
+    diff = abs(rashi1 - rashi2)
+    if diff == 0:
+        return 5
+    elif diff in [1, 5, 9]:
+        return 4
+    elif diff in [2, 4, 6, 8, 10]:
+        return 3
+    else:
+        return 2
+
+def calculate_gana_compatibility(nakshatra1, nakshatra2):
+    """Calculate Gana compatibility (0-6 points)"""
+    # Simplified calculation
+    diff = abs(nakshatra1 - nakshatra2)
+    if diff == 0:
+        return 6
+    elif diff in [1, 2, 3]:
+        return 5
+    elif diff in [4, 5, 6]:
+        return 4
+    else:
+        return 3
+
+def calculate_bhakoot_compatibility(rashi1, rashi2):
+    """Calculate Bhakoot compatibility (0-7 points)"""
+    # Simplified calculation
+    diff = abs(rashi1 - rashi2)
+    if diff == 0:
+        return 7
+    elif diff in [1, 2, 3]:
+        return 6
+    elif diff in [4, 5, 6]:
+        return 5
+    else:
+        return 4
+
+def calculate_nadi_compatibility(nakshatra1, nakshatra2):
+    """Calculate Nadi compatibility (0-8 points)"""
+    # Simplified calculation
+    diff = abs(nakshatra1 - nakshatra2)
+    if diff == 0:
+        return 8
+    elif diff in [1, 2, 3]:
+        return 7
+    elif diff in [4, 5, 6]:
+        return 6
+    else:
+        return 5
+
+def generate_gun_milan_breakdown(chart1, chart2):
+    """Generate detailed breakdown of all 8 gunas"""
+    return {
+        "varna": {
+            "score": 1 if ((chart1["rashi"] - 1) % 4) == ((chart2["rashi"] - 1) % 4) else 0,
+            "max": 1,
+            "description": "Social compatibility and class harmony"
+        },
+        "vashya": {
+            "score": calculate_vashya_compatibility(chart1["rashi"], chart2["rashi"]),
+            "max": 2,
+            "description": "Control and dominance compatibility"
+        },
+        "tara": {
+            "score": calculate_tara_compatibility(chart1["nakshatra"], chart2["nakshatra"]),
+            "max": 3,
+            "description": "Star compatibility and destiny alignment"
+        },
+        "yoni": {
+            "score": calculate_yoni_compatibility(chart1["nakshatra"], chart2["nakshatra"]),
+            "max": 4,
+            "description": "Sexual compatibility and physical harmony"
+        },
+        "graha_maitri": {
+            "score": calculate_graha_maitri(chart1["rashi"], chart2["rashi"]),
+            "max": 5,
+            "description": "Planetary friendship and mental compatibility"
+        },
+        "gana": {
+            "score": calculate_gana_compatibility(chart1["nakshatra"], chart2["nakshatra"]),
+            "max": 6,
+            "description": "Temperament and nature compatibility"
+        },
+        "bhakoot": {
+            "score": calculate_bhakoot_compatibility(chart1["rashi"], chart2["rashi"]),
+            "max": 7,
+            "description": "Love and affection compatibility"
+        },
+        "nadi": {
+            "score": calculate_nadi_compatibility(chart1["nakshatra"], chart2["nakshatra"]),
+            "max": 8,
+            "description": "Health and progeny compatibility"
+        }
+    }
+
+def generate_compatibility_remarks(score, max_score):
+    """Generate detailed remarks based on compatibility score"""
+    percentage = (score / max_score) * 100
+    
+    if percentage >= 80:
+        return f"Excellent compatibility! With a score of {score}/{max_score} ({percentage:.1f}%), this is considered an ideal match in Vedic astrology. The couple shares strong spiritual, emotional, and physical harmony."
+    elif percentage >= 60:
+        return f"Good compatibility with a score of {score}/{max_score} ({percentage:.1f}%). This relationship has strong potential but may require some understanding and compromise from both partners."
+    elif percentage >= 40:
+        return f"Moderate compatibility scoring {score}/{max_score} ({percentage:.1f}%). While there are challenges, with mutual effort and understanding, this relationship can work well."
+    elif percentage >= 20:
+        return f"Low compatibility with a score of {score}/{max_score} ({percentage:.1f}%). This relationship will require significant effort, patience, and understanding from both partners."
+    else:
+        return f"Very low compatibility scoring {score}/{max_score} ({percentage:.1f}%). This match faces significant challenges and may not be advisable according to Vedic principles."
+
+def detect_compatibility_issues(chart1, chart2, score):
+    """Detect potential compatibility issues"""
+    issues = []
+    
+    if score < 18:
+        issues.append("Low overall compatibility score indicates potential relationship challenges")
+    
+    # Check for specific problematic combinations
+    rashi_diff = abs(chart1["rashi"] - chart2["rashi"])
+    if rashi_diff == 6:  # Opposition signs
+        issues.append("Opposition of zodiac signs may create tension and conflicts")
+    
+    nakshatra_diff = abs(chart1["nakshatra"] - chart2["nakshatra"])
+    if nakshatra_diff == 13:  # Opposition nakshatras
+        issues.append("Opposition of nakshatras may affect emotional compatibility")
+    
+    if score < 25:
+        issues.append("Consider consulting a Vedic astrologer for detailed guidance")
+    
+    return issues
+
+def calculate_spiritual_alignment(chart1, chart2):
+    """Calculate spiritual alignment score (0-100)"""
+    # Simplified calculation based on nakshatra compatibility
+    nakshatra_diff = abs(chart1["nakshatra"] - chart2["nakshatra"])
+    
+    if nakshatra_diff == 0:
+        return 100
+    elif nakshatra_diff <= 3:
+        return 85
+    elif nakshatra_diff <= 6:
+        return 70
+    elif nakshatra_diff <= 9:
+        return 55
+    elif nakshatra_diff <= 13:
+        return 40
+    else:
+        return 25
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

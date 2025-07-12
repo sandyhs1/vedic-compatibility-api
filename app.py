@@ -586,7 +586,7 @@ IMPORTANT REQUIREMENTS:
 Generate a report that would make a master Vedic astrologer proud - comprehensive, accurate, beautiful, and deeply meaningful."""
 
         # Call Azure OpenAI API
-        azure_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
+        azure_endpoint = os.environ.get('AZURE_OPENAI_API_BASE') or os.environ.get('AZURE_OPENAI_ENDPOINT')
         deployment_name = os.environ.get('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
         api_version = os.environ.get('AZURE_OPENAI_API_VERSION', '2024-11-20')
         

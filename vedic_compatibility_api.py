@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pyswisseph as swe
+import swisseph as swe
 from datetime import datetime
 import math
 import json

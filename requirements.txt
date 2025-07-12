@@ -1,4 +1,4 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
-pyswisseph==2.10.3.2
+swisseph==0.0.0.dev1
 Werkzeug==2.3.7 

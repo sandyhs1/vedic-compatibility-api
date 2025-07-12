@@ -328,6 +328,17 @@ NAKSHATRA_LORDS = [
     "Jupiter", "Saturn", "Mercury"
 ]
 
+@app.route('/debug/env', methods=['GET'])
+def debug_env():
+    """Debug endpoint to check environment variables"""
+    return jsonify({
+        "AZURE_OPENAI_API_KEY": "SET" if os.environ.get('AZURE_OPENAI_API_KEY') else "NOT SET",
+        "AZURE_OPENAI_API_BASE": "SET" if os.environ.get('AZURE_OPENAI_API_BASE') else "NOT SET",
+        "AZURE_OPENAI_ENDPOINT": "SET" if os.environ.get('AZURE_OPENAI_ENDPOINT') else "NOT SET",
+        "AZURE_OPENAI_DEPLOYMENT_NAME": os.environ.get('AZURE_OPENAI_DEPLOYMENT_NAME', 'NOT SET'),
+        "AZURE_OPENAI_API_VERSION": os.environ.get('AZURE_OPENAI_API_VERSION', 'NOT SET')
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy", "message": "Vedic Compatibility API v2.0 is running"})

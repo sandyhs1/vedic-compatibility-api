@@ -1,6 +1,8 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
 numpy>=1.26.0
-skyfield==1.53
 requests==2.31.0 
-pytz 
+pytz
+pyswisseph>=2.10.3
+geopy>=2.4.0
+timezonefinder>=6.2.0 

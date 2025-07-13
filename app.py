@@ -8,17 +8,58 @@ import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
-from skyfield.api import load, wgs84, utc
-from skyfield.almanac import find_discrete, risings_and_settings
-from skyfield.data import hipparcos
-from skyfield.units import Angle
 from datetime import datetime
 import math
 import re
 import pytz
 
+# Import Swiss Ephemeris and geocoding libraries
+try:
+    import swisseph as swe
+    from geopy.geocoders import Nominatim
+    from timezonefinder import TimezoneFinder
+    SWISS_EPHEMERIS_AVAILABLE = True
+except ImportError:
+    print("Warning: Swiss Ephemeris libraries not available. Install with: pip install pyswisseph geopy timezonefinder")
+    SWISS_EPHEMERIS_AVAILABLE = False
+
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=['http://localhost:3000', 'http://localhost:3001', 'https://soulsync.tech', 'https://www.soulsync.tech'], 
+     methods=['GET', 'POST', 'OPTIONS'], 
+     allow_headers=['Content-Type', 'Authorization'])
+
+# Initialize Swiss Ephemeris with proper settings
+if SWISS_EPHEMERIS_AVAILABLE:
+    # Set Swiss Ephemeris path and ayanamsa
+    swe.set_ephe_path('.')
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+# Vedic astrology constants
+NAKSHATRAS = [
+    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
+    "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni",
+    "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha",
+    "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha",
+    "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
+]
+
+RASHIS = [
+    "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya",
+    "Tula", "Vrischika", "Dhanu", "Makara", "Kumbha", "Meena"
+]
+
+NAKSHATRA_LORDS = [
+    "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
+    "Jupiter", "Saturn", "Mercury", "Ketu", "Venus", "Sun",
+    "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury",
+    "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
+    "Jupiter", "Saturn", "Mercury"
+]
+
+RASHI_LORDS = [
+    "Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury",
+    "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter"
+]
 
 # Local geocoding database for common Indian cities
 INDIAN_CITIES = {
@@ -115,81 +156,119 @@ INDIAN_CITIES = {
     "akola": {"lat": 20.7096, "lon": 77.0021, "tz": "Asia/Kolkata"},
     "jamnagar": {"lat": 22.4707, "lon": 70.0577, "tz": "Asia/Kolkata"},
     "bhayandar": {"lat": 19.2969, "lon": 72.8500, "tz": "Asia/Kolkata"},
-    "morvi": {"lat": 22.8173, "lon": 70.8372, "tz": "Asia/Kolkata"}
+    "morvi": {"lat": 22.8173, "lon": 70.8372, "tz": "Asia/Kolkata"},
+    "vizag": {"lat": 17.6868, "lon": 83.2185, "tz": "Asia/Kolkata"}
 }
 
 def get_coordinates(place):
-    """Get coordinates and timezone for a place using local database"""
+    """Get coordinates and timezone for a place using geopy or local database"""
     place_lower = place.lower().strip()
     
-    # Check if place is in our database
+    # First try local database for common Indian cities
     if place_lower in INDIAN_CITIES:
         city_data = INDIAN_CITIES[place_lower]
         return city_data["lat"], city_data["lon"], city_data["tz"]
     
-    # Default to Mumbai if not found
+    # If Swiss Ephemeris is available, try geopy
+    if SWISS_EPHEMERIS_AVAILABLE:
+        try:
+            geo = Nominatim(user_agent="soulsync")
+            location = geo.geocode(place)
+            if location:
+                lat, lon = location.latitude, location.longitude
+                # Get timezone
+                tf = TimezoneFinder()
+                tz_name = tf.timezone_at(lng=lon, lat=lat)
+                if not tz_name:
+                    tz_name = "Asia/Kolkata"  # Default for India
+                return lat, lon, tz_name
+        except Exception as e:
+            print(f"Geopy error for {place}: {e}")
+    
+    # Fallback to Mumbai if not found
     default_data = INDIAN_CITIES["mumbai"]
     return default_data["lat"], default_data["lon"], default_data["tz"]
 
-def calculate_birth_chart(date_str, time_str, place):
-    """Calculate birth chart using proper Vedic astrology principles"""
+def convert_to_utc(dob_str, tob_str, place):
+    """Convert local date/time to UTC Julian Day"""
     try:
         # Parse date and time
-        date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        dt_local = datetime.strptime(f"{dob_str} {tob_str}", "%Y-%m-%d %H:%M")
         
         # Get coordinates and timezone
         lat, lon, tz_name = get_coordinates(place)
         
         # Convert local time to UTC
         local_tz = pytz.timezone(tz_name)
-        local_dt = local_tz.localize(date_obj)
+        local_dt = local_tz.localize(dt_local)
         utc_dt = local_dt.astimezone(pytz.UTC)
         
-        # Load ephemeris
-        ts = load.timescale()
-        t = ts.from_datetime(utc_dt)
+        # Calculate Julian Day
+        jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, 
+                       utc_dt.hour + utc_dt.minute / 60.0)
         
-        # Get Moon position (for Nakshatra calculation)
-        eph = load('de421.bsp')
-        moon = eph['moon']
-        earth = eph['earth']
+        return jd, lat, lon, utc_dt
+    except Exception as e:
+        print(f"Error converting to UTC: {e}")
+        raise
+
+def get_moon_data(jd):
+    """Get Moon's position using Swiss Ephemeris"""
+    try:
+        # Calculate Moon's position
+        moon_long, _ = swe.calc_ut(jd, swe.MOON)
         
-        # Calculate Moon's position relative to Earth
-        astrometric = earth.at(t).observe(moon)
-        ra, dec, distance = astrometric.radec()
-        
-        # Convert to ecliptic longitude
-        moon_longitude = ra.hours * 15  # Convert hours to degrees
-        
-        # Apply Lahiri Ayanamsa correction for sidereal zodiac
-        # Lahiri Ayanamsa formula: 23.85 + (year - 2000) * 0.000000317
-        year = utc_dt.year
-        ayanamsa = 23.85 + (year - 2000) * 0.000000317
-        
-        # Calculate sidereal longitude
-        sidereal_longitude = moon_longitude - ayanamsa
-        
-        # Normalize to 0-360 degrees
-        sidereal_longitude = (sidereal_longitude + 360) % 360
+        # Get sidereal longitude (already corrected for ayanamsa)
+        sidereal_long = moon_long[0]  # Longitude in degrees
         
         # Calculate rashi (zodiac sign) - 0-11
-        rashi = int(sidereal_longitude / 30)
+        rashi_index = int(sidereal_long / 30)
+        rashi_index = max(0, min(11, rashi_index))
         
         # Calculate nakshatra (lunar mansion) - 0-26
-        nakshatra = int(sidereal_longitude / 13.333333)
-        
-        # Ensure valid ranges
-        rashi = max(0, min(11, rashi))
-        nakshatra = max(0, min(26, nakshatra))
+        nakshatra_index = int(sidereal_long / (360 / 27))
+        nakshatra_index = max(0, min(26, nakshatra_index))
         
         return {
-            "rashi": rashi + 1,  # Convert to 1-based indexing
-            "nakshatra": nakshatra + 1,  # Convert to 1-based indexing
-            "longitude": sidereal_longitude,
+            "longitude": sidereal_long,
+            "rashi": rashi_index + 1,  # Convert to 1-based indexing
+            "nakshatra": nakshatra_index + 1,  # Convert to 1-based indexing
+            "rashi_name": RASHIS[rashi_index],
+            "nakshatra_name": NAKSHATRAS[nakshatra_index],
+            "rashi_lord": RASHI_LORDS[rashi_index],
+            "nakshatra_lord": NAKSHATRA_LORDS[nakshatra_index]
+        }
+    except Exception as e:
+        print(f"Error calculating Moon data: {e}")
+        raise
+
+def calculate_birth_chart(date_str, time_str, place):
+    """Calculate birth chart using Swiss Ephemeris for accurate Vedic astrology"""
+    try:
+        if not SWISS_EPHEMERIS_AVAILABLE:
+            raise Exception("Swiss Ephemeris not available. Install with: pip install pyswisseph geopy timezonefinder")
+        
+        # Convert to UTC and get Julian Day
+        jd, lat, lon, utc_dt = convert_to_utc(date_str, time_str, place)
+        
+        # Get Moon's position using Swiss Ephemeris
+        moon_data = get_moon_data(jd)
+        
+        # Get timezone name
+        _, _, tz_name = get_coordinates(place)
+        
+        return {
+            "rashi": moon_data["rashi"],
+            "nakshatra": moon_data["nakshatra"],
+            "longitude": moon_data["longitude"],
+            "rashi_name": moon_data["rashi_name"],
+            "nakshatra_name": moon_data["nakshatra_name"],
+            "rashi_lord": moon_data["rashi_lord"],
+            "nakshatra_lord": moon_data["nakshatra_lord"],
             "coordinates": {"lat": lat, "lon": lon},
-            "ayanamsa": ayanamsa,
             "timezone": tz_name,
-            "utc_time": utc_dt.isoformat()
+            "utc_time": utc_dt.isoformat(),
+            "julian_day": jd
         }
         
     except Exception as e:
@@ -457,21 +536,21 @@ def compatibility():
         # Calculate spiritual alignment
         spiritual_alignment_score = calculate_spiritual_alignment(chart1, chart2)
         
-        # Format charts with proper names
+        # Format charts with proper names (already calculated by Swiss Ephemeris)
         partner1_chart = {
             "longitude": chart1["longitude"],
-            "nakshatra": NAKSHATRA_NAMES[chart1["nakshatra"] - 1],
-            "nakshatra_lord": NAKSHATRA_LORDS[chart1["nakshatra"] - 1],
-            "rashi": RASHI_NAMES[chart1["rashi"] - 1],
-            "rashi_lord": RASHI_LORDS[chart1["rashi"] - 1]
+            "nakshatra": chart1["nakshatra_name"],
+            "nakshatra_lord": chart1["nakshatra_lord"],
+            "rashi": chart1["rashi_name"],
+            "rashi_lord": chart1["rashi_lord"]
         }
         
         partner2_chart = {
             "longitude": chart2["longitude"],
-            "nakshatra": NAKSHATRA_NAMES[chart2["nakshatra"] - 1],
-            "nakshatra_lord": NAKSHATRA_LORDS[chart2["nakshatra"] - 1],
-            "rashi": RASHI_NAMES[chart2["rashi"] - 1],
-            "rashi_lord": RASHI_LORDS[chart2["rashi"] - 1]
+            "nakshatra": chart2["nakshatra_name"],
+            "nakshatra_lord": chart2["nakshatra_lord"],
+            "rashi": chart2["rashi_name"],
+            "rashi_lord": chart2["rashi_lord"]
         }
         
         # Return the complete compatibility report
@@ -530,21 +609,26 @@ def enhanced_compatibility():
         # Calculate spiritual alignment
         spiritual_alignment_score = calculate_spiritual_alignment(chart1, chart2)
         
-        # Format charts with proper Sanskrit names
+        # Generate custom affirmations and mantras based on nakshatra
+        custom_affirmations = generate_custom_affirmations(chart1, chart2)
+        personalized_mantras = generate_personalized_mantras(chart1, chart2)
+        couple_synergy = calculate_couple_synergy(chart1, chart2)
+        
+        # Format charts with proper Sanskrit names (already calculated by Swiss Ephemeris)
         partner1_chart = {
             "longitude": chart1["longitude"],
-            "nakshatra": NAKSHATRA_NAMES[chart1["nakshatra"] - 1],
-            "nakshatra_lord": NAKSHATRA_LORDS[chart1["nakshatra"] - 1],
-            "rashi": RASHI_NAMES[chart1["rashi"] - 1],
-            "rashi_lord": RASHI_LORDS[chart1["rashi"] - 1]
+            "nakshatra": chart1["nakshatra_name"],
+            "nakshatra_lord": chart1["nakshatra_lord"],
+            "rashi": chart1["rashi_name"],
+            "rashi_lord": chart1["rashi_lord"]
         }
         
         partner2_chart = {
             "longitude": chart2["longitude"],
-            "nakshatra": NAKSHATRA_NAMES[chart2["nakshatra"] - 1],
-            "nakshatra_lord": NAKSHATRA_LORDS[chart2["nakshatra"] - 1],
-            "rashi": RASHI_NAMES[chart2["rashi"] - 1],
-            "rashi_lord": RASHI_LORDS[chart2["rashi"] - 1]
+            "nakshatra": chart2["nakshatra_name"],
+            "nakshatra_lord": chart2["nakshatra_lord"],
+            "rashi": chart2["rashi_name"],
+            "rashi_lord": chart2["rashi_lord"]
         }
         
         # Prepare Vedic data for GPT-4o
@@ -559,7 +643,10 @@ def enhanced_compatibility():
             "partner1_chart": partner1_chart,
             "partner2_chart": partner2_chart,
             "partner1_details": partner1_data,
-            "partner2_details": partner2_data
+            "partner2_details": partner2_data,
+            "custom_affirmations": custom_affirmations,
+            "personalized_mantras": personalized_mantras,
+            "couple_synergy": couple_synergy
         }
         
         # Generate enhanced report using GPT-4o
@@ -949,6 +1036,198 @@ def calculate_spiritual_alignment(chart1, chart2):
         return 40
     else:
         return 25
+
+def generate_custom_affirmations(chart1, chart2):
+    """Generate custom affirmations based on nakshatra and couple synergy"""
+    nakshatra1 = chart1["nakshatra_name"]
+    nakshatra2 = chart2["nakshatra_name"]
+    rashi1 = chart1["rashi_name"]
+    rashi2 = chart2["rashi_name"]
+    
+    # Nakshatra-based affirmations
+    nakshatra_affirmations = {
+        "Ashwini": "I am blessed with divine energy and spiritual awakening",
+        "Bharani": "I embrace transformation and new beginnings with courage",
+        "Krittika": "I am a beacon of light and spiritual guidance",
+        "Rohini": "I attract abundance and nurture growth in all relationships",
+        "Mrigashira": "I explore the depths of love with curiosity and wonder",
+        "Ardra": "I transform challenges into opportunities for growth",
+        "Punarvasu": "I am renewed and restored through divine grace",
+        "Pushya": "I am nourished and protected by cosmic blessings",
+        "Ashlesha": "I embrace my intuitive wisdom and spiritual power",
+        "Magha": "I honor my ancestors and carry forward their legacy",
+        "Purva Phalguni": "I create beauty and harmony in all my relationships",
+        "Uttara Phalguni": "I share my gifts generously and receive love abundantly",
+        "Hasta": "I manifest my dreams with skill and divine guidance",
+        "Chitra": "I create beautiful patterns of love and understanding",
+        "Swati": "I flow with grace and adapt to life's changes",
+        "Vishakha": "I achieve my goals through determination and spiritual focus",
+        "Anuradha": "I build lasting relationships through loyalty and devotion",
+        "Jyeshtha": "I lead with wisdom and protect those I love",
+        "Mula": "I discover my true purpose and spiritual foundation",
+        "Purva Ashadha": "I overcome obstacles with strength and determination",
+        "Uttara Ashadha": "I reach spiritual heights through patience and perseverance",
+        "Shravana": "I listen to divine guidance and learn from every experience",
+        "Dhanishta": "I create harmony and abundance through my talents",
+        "Shatabhisha": "I heal and transform through spiritual wisdom",
+        "Purva Bhadrapada": "I break free from limitations and embrace my power",
+        "Uttara Bhadrapada": "I serve humanity with compassion and spiritual insight",
+        "Revati": "I complete cycles with grace and prepare for new beginnings"
+    }
+    
+    # Couple-specific affirmations
+    couple_affirmations = [
+        f"Together, {nakshatra1} and {nakshatra2} create a sacred bond of divine love",
+        f"Our {rashi1} and {rashi2} energies harmonize to create perfect balance",
+        "We are blessed with cosmic alignment and spiritual growth together",
+        "Our love transcends the physical and reaches the divine realm",
+        "We support each other's spiritual journey and personal evolution",
+        "Our relationship is a sacred temple of love, trust, and mutual respect",
+        "We attract abundance and blessings through our united energy",
+        "Our love story is written in the stars and guided by divine wisdom"
+    ]
+    
+    return {
+        "individual": [
+            nakshatra_affirmations.get(nakshatra1, "I am blessed with divine love and spiritual growth"),
+            nakshatra_affirmations.get(nakshatra2, "I am blessed with divine love and spiritual growth")
+        ],
+        "couple": couple_affirmations,
+        "daily": [
+            "I choose love, understanding, and growth in my relationship",
+            "I communicate with love, patience, and compassion",
+            "I honor and respect my partner's unique spiritual journey",
+            "I create sacred moments of connection and intimacy",
+            "I trust in the divine timing and purpose of our relationship"
+        ]
+    }
+
+def generate_personalized_mantras(chart1, chart2):
+    """Generate personalized mantras based on nakshatra and couple synergy"""
+    nakshatra1 = chart1["nakshatra_name"]
+    nakshatra2 = chart2["nakshatra_name"]
+    rashi1 = chart1["rashi_name"]
+    rashi2 = chart2["rashi_name"]
+    
+    # Nakshatra-specific mantras
+    nakshatra_mantras = {
+        "Ashwini": "Om Ashwini Kumaraya Namah",
+        "Bharani": "Om Yamaaya Namah",
+        "Krittika": "Om Agni Devaya Namah",
+        "Rohini": "Om Brahmaaya Namah",
+        "Mrigashira": "Om Somaaya Namah",
+        "Ardra": "Om Rudraaya Namah",
+        "Punarvasu": "Om Aditi Devaya Namah",
+        "Pushya": "Om Brihaspataye Namah",
+        "Ashlesha": "Om Nagaaya Namah",
+        "Magha": "Om Pitru Devaya Namah",
+        "Purva Phalguni": "Om Bhagaaya Namah",
+        "Uttara Phalguni": "Om Aryamaaya Namah",
+        "Hasta": "Om Savitri Devaya Namah",
+        "Chitra": "Om Vishwakarmaaya Namah",
+        "Swati": "Om Vayu Devaya Namah",
+        "Vishakha": "Om Indra Agni Devaya Namah",
+        "Anuradha": "Om Mitraaya Namah",
+        "Jyeshtha": "Om Indraaya Namah",
+        "Mula": "Om Nirriti Devaya Namah",
+        "Purva Ashadha": "Om Aap Devaya Namah",
+        "Uttara Ashadha": "Om Vishwa Devaya Namah",
+        "Shravana": "Om Vishnu Devaya Namah",
+        "Dhanishta": "Om Vasu Devaya Namah",
+        "Shatabhisha": "Om Varunaaya Namah",
+        "Purva Bhadrapada": "Om Aja Ekapadaaya Namah",
+        "Uttara Bhadrapada": "Om Ahir Budhnyaaya Namah",
+        "Revati": "Om Pushan Devaya Namah"
+    }
+    
+    # Love and relationship mantras
+    love_mantras = [
+        "Om Kleem Krishnaya Namah",  # For love and attraction
+        "Om Hreem Shreem Kleem",     # For harmony and prosperity
+        "Om Namah Shivaya",          # For spiritual growth
+        "Om Gam Ganapataye Namah",   # For removing obstacles
+        "Om Shreem Mahalakshmiyei Namah"  # For abundance and love
+    ]
+    
+    return {
+        "individual": [
+            {
+                "mantra": nakshatra_mantras.get(nakshatra1, "Om Namah Shivaya"),
+                "meaning": f"Invokes the divine energy of {nakshatra1} nakshatra",
+                "usage": "Chant 108 times daily for spiritual alignment"
+            },
+            {
+                "mantra": nakshatra_mantras.get(nakshatra2, "Om Namah Shivaya"),
+                "meaning": f"Invokes the divine energy of {nakshatra2} nakshatra",
+                "usage": "Chant 108 times daily for spiritual alignment"
+            }
+        ],
+        "couple": [
+            {
+                "mantra": "Om Kleem Krishnaya Namah",
+                "meaning": "Mantra for divine love and attraction",
+                "usage": "Chant together 21 times daily for relationship harmony"
+            },
+            {
+                "mantra": "Om Hreem Shreem Kleem",
+                "meaning": "Mantra for harmony, prosperity, and love",
+                "usage": "Chant together 11 times before important decisions"
+            }
+        ],
+        "daily": love_mantras[0],
+        "weekly": love_mantras[1],
+        "special_occasions": love_mantras[2]
+    }
+
+def calculate_couple_synergy(chart1, chart2):
+    """Calculate couple synergy based on nakshatra and rashi compatibility"""
+    nakshatra1 = chart1["nakshatra"]
+    nakshatra2 = chart2["nakshatra"]
+    rashi1 = chart1["rashi"]
+    rashi2 = chart2["rashi"]
+    
+    # Calculate synergy score (0-100)
+    nakshatra_synergy = 100 - (abs(nakshatra1 - nakshatra2) * 3.7)  # Max 100, min 0
+    rashi_synergy = 100 - (abs(rashi1 - rashi2) * 8.33)  # Max 100, min 0
+    
+    total_synergy = (nakshatra_synergy + rashi_synergy) / 2
+    
+    # Determine synergy level
+    if total_synergy >= 85:
+        level = "Divine Harmony"
+        description = "Exceptional cosmic alignment with deep spiritual connection"
+    elif total_synergy >= 70:
+        level = "Sacred Union"
+        description = "Strong spiritual bond with excellent growth potential"
+    elif total_synergy >= 55:
+        level = "Balanced Partnership"
+        description = "Good compatibility with room for spiritual growth"
+    elif total_synergy >= 40:
+        level = "Learning Journey"
+        description = "Opportunity for mutual growth and understanding"
+    else:
+        level = "Transformative Path"
+        description = "Challenging but potentially transformative relationship"
+    
+    return {
+        "score": round(total_synergy, 1),
+        "level": level,
+        "description": description,
+        "nakshatra_synergy": round(nakshatra_synergy, 1),
+        "rashi_synergy": round(rashi_synergy, 1),
+        "strengths": [
+            f"Strong {chart1['nakshatra_name']} and {chart2['nakshatra_name']} compatibility",
+            f"Harmonious {chart1['rashi_name']} and {chart2['rashi_name']} energy",
+            "Potential for deep spiritual growth together",
+            "Complementary personality traits and strengths"
+        ],
+        "growth_areas": [
+            "Communication and understanding differences",
+            "Balancing individual and relationship needs",
+            "Developing shared spiritual practices",
+            "Building trust and emotional intimacy"
+        ]
+    }
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

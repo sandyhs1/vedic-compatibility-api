@@ -24,7 +24,7 @@ except ImportError:
     SWISS_EPHEMERIS_AVAILABLE = False
 
 app = Flask(__name__)
-CORS(app, origins=['http://localhost:3000', 'http://localhost:3001', 'https://soulsync.tech', 'https://www.soulsync.tech'], 
+CORS(app, origins=['*'], 
      methods=['GET', 'POST', 'OPTIONS'], 
      allow_headers=['Content-Type', 'Authorization'])
 
